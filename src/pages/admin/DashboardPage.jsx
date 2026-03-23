@@ -8,7 +8,7 @@ import { YEAR_DAYS, computeExpirationDate, getAccountStatus, getRemainingDays } 
 
 const DashboardPage = () => {
   const navigate = useNavigate();
-  const { signingEnabled, setSigningEnabled, students, showToast, offices, signatories, showConfirm, logAction } = useContext(AppContext);
+  const { signingEnabled, setSigningEnabled, students, showToast, offices, signatories, showConfirm, logAction, eligibleStudents } = useContext(AppContext);
   return (
     <div className="animate-fade-in space-y-8">
       <div>
@@ -43,6 +43,7 @@ const DashboardPage = () => {
             <button onClick={() => navigate('/year-levels')} className="flex items-center gap-2 p-3 text-left border dark:border-slate-600 rounded-lg font-bold hover:bg-slate-50 dark:hover:bg-slate-700 dark:text-white transition text-xs"><CalendarIcon className="w-5 h-5 text-slate-500" /> Year Levels</button>
             <button onClick={() => navigate('/requirements')} className="flex items-center gap-2 p-3 text-left border dark:border-slate-600 rounded-lg font-bold hover:bg-slate-50 dark:hover:bg-slate-700 dark:text-white transition text-xs"><FileCheckIcon className="w-5 h-5 text-slate-500" /> Requirements</button>
             <button onClick={() => navigate('/logs')} className="flex items-center gap-2 p-3 text-left border dark:border-slate-600 rounded-lg font-bold hover:bg-slate-50 dark:hover:bg-slate-700 dark:text-white transition text-xs"><FileTextIcon className="w-5 h-5 text-slate-500" /> Audit Logs</button>
+            <button onClick={() => navigate('/eligible-students')} className="flex items-center gap-2 p-3 text-left border dark:border-slate-600 rounded-lg font-bold hover:bg-slate-50 dark:hover:bg-slate-700 dark:text-white transition text-xs"><ShieldIcon className="w-5 h-5 text-slate-500" /> Pre-Registered</button>
           </div>
         </Card>
 

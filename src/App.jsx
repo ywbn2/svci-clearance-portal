@@ -14,6 +14,8 @@ import DepartmentsPage from './pages/admin/DepartmentsPage';
 import YearLevelsPage from './pages/admin/YearLevelsPage';
 import RequirementsPage from './pages/admin/RequirementsPage';
 import AuditLogsPage from './pages/admin/AuditLogsPage';
+import EligibleStudentsPage from './pages/admin/EligibleStudentsPage';
+import EligibleStudentsPage from './pages/admin/EligibleStudentsPage';
 import SignatoryDashboardPage from './pages/signatory/SignatoryDashboardPage';
 import SignatoryStudentsPage from './pages/signatory/SignatoryStudentsPage';
 import StudentDashboardPage from './pages/student/StudentDashboard';
@@ -60,6 +62,7 @@ const InnerAppRoutes = () => {
                 <Route path="/year-levels" element={<YearLevelsPage />} />
                 <Route path="/requirements" element={<RequirementsPage />} />
                 <Route path="/logs" element={<AuditLogsPage />} />
+                <Route path="/eligible-students" element={<EligibleStudentsPage />} />
               </Routes>
             </ProtectedAdminLayout>
           } />

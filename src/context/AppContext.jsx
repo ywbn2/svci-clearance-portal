@@ -80,8 +80,8 @@ export const AppProvider = ({ children }) => {
 
   const [signatories, setSignatories] = useState([]);
   const [adminUsers, setAdminUsers] = useState([]);
-  
   const [requirements, setRequirements] = useState([]);
+  const [eligibleStudents, setEligibleStudents] = useState([]); // Master list of pre-approved students
 
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('portal_session');
@@ -240,7 +240,7 @@ export const AppProvider = ({ children }) => {
     const fetchData = async () => {
       const [
         { data: st }, { data: adminData }, { data: sigData },
-        { data: cData }, { data: dData }, { data: dcData }, { data: reqData }
+        { data: cData }, { data: dData }, { data: dcData }, { data: reqData }, { data: eligData }
       ] = await Promise.all([
         supabase.from('students').select('*'),
         supabase.from('admin_users').select('*'),
@@ -248,7 +248,8 @@ export const AppProvider = ({ children }) => {
         supabase.from('courses').select('id, name, code'),
         supabase.from('departments').select('*'),
         supabase.from('department_courses').select('*'),
-        supabase.from('requirements').select('*')
+        supabase.from('requirements').select('*'),
+        supabase.from('eligible_students').select('*')
       ]);
 
       if (st) setStudents(st);
@@ -262,6 +263,7 @@ export const AppProvider = ({ children }) => {
         })));
       }
       if (reqData) setRequirements(reqData);
+      if (eligData) setEligibleStudents(eligData);
     };
     
     fetchData();
@@ -323,6 +325,19 @@ export const AppProvider = ({ children }) => {
       })
       .subscribe();
 
+    const eligChannel = supabase
+      .channel('rt-eligible-students')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'eligible_students' }, ({ new: row }) => {
+        setEligibleStudents(prev => prev.find(e => e.school_id === row.school_id) ? prev : [...prev, row]);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'eligible_students' }, ({ new: row }) => {
+        setEligibleStudents(prev => prev.map(e => e.school_id === row.school_id ? row : e));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'eligible_students' }, ({ old: row }) => {
+        setEligibleStudents(prev => prev.filter(e => e.school_id !== row.school_id));
+      })
+      .subscribe();
+
     const coursesChannel = supabase
       .channel('rt-courses')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'courses' }, async () => {
@@ -371,6 +386,7 @@ export const AppProvider = ({ children }) => {
       supabase.removeChannel(coursesChannel);
       supabase.removeChannel(deptChannel);
       supabase.removeChannel(deptCourseChannel);
+      supabase.removeChannel(eligChannel);
     };
   }, []);
 
@@ -382,7 +398,7 @@ export const AppProvider = ({ children }) => {
       darkMode, setDarkMode, signingEnabled, setSigningEnabled,
       courses, setCourses, departments, setDepartments, yearLevels, setYearLevels, students, setStudents,
       offices, setOffices, officeCategories, setOfficeCategories, signatories, setSignatories, requirements, setRequirements,
-      adminUsers, setAdminUsers, currentUser, setCurrentUser,
+      adminUsers, setAdminUsers, eligibleStudents, setEligibleStudents, currentUser, setCurrentUser,
       toast, showToast, triggerGlobalSync, showConfirm, logAction
     }}>
       <div className={`${darkMode ? 'dark' : ''} min-h-screen transition-colors duration-300 relative`}>

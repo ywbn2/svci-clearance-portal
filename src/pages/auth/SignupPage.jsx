@@ -7,7 +7,7 @@ import { YEAR_DAYS, computeExpirationDate, getAccountStatus, getRemainingDays } 
 import emailjs from '@emailjs/browser';
 
 const SignupPage = () => {
-  const { darkMode, courses, departments, students, setStudents, yearLevels, currentUser } = useContext(AppContext);
+  const { darkMode, courses, departments, students, setStudents, yearLevels, currentUser, eligibleStudents } = useContext(AppContext);
   const navigate = useNavigate();
   
   const [formData, setFormData] = useState({
@@ -40,11 +40,11 @@ const SignupPage = () => {
       return setError("Please fill in all required fields (including Year Level).");
     }
     
-    const preRegisteredStudent = students.find(s => s.id === formData.id);
+    const preRegisteredStudent = eligibleStudents.find(s => s.school_id === formData.id);
     if (!preRegisteredStudent) return setError("Security Error: This School ID was not found in the official registry. Please contact administration.");
 
-    const isFirstNameMatch = preRegisteredStudent.firstname?.toLowerCase() === formData.firstname.trim().toLowerCase();
-    const isLastNameMatch = preRegisteredStudent.lastname?.toLowerCase() === formData.lastname.trim().toLowerCase();
+    const isFirstNameMatch = String(preRegisteredStudent.firstname).trim().toLowerCase() === formData.firstname.trim().toLowerCase();
+    const isLastNameMatch = String(preRegisteredStudent.lastname).trim().toLowerCase() === formData.lastname.trim().toLowerCase();
     if (!isFirstNameMatch || !isLastNameMatch) return setError("Security Error: The First Name or Last Name does not match the official school records for this ID.");
 
     setIsLoading(true);

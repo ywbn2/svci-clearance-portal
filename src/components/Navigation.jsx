@@ -76,6 +76,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
     { path: '/year-levels', icon: <CalendarIcon />, label: 'Year Levels' },
     { path: '/requirements', icon: <FileCheckIcon />, label: 'Requirements' },
     { path: '/logs', icon: <FileTextIcon />, label: 'Audit Logs' },
+    { path: '/eligible-students', icon: <ShieldIcon />, label: 'Pre-Registered' },
   ];
 
   const sidebarContent = (

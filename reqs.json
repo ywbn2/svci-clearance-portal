@@ -1,0 +1,20 @@
+[
+  {
+    "id": "4dd1215b-5f46-4f68-a7a8-9227e9fe3be9",
+    "office": "Dept. Treasurer",
+    "title": "asdasdasdasdasdasdasdasd",
+    "description": "asdasdasdasdasdasdasdasd",
+    "mandatory": true,
+    "author": "Unknown",
+    "created_at": "2026-03-22T10:13:31.555795+00:00"
+  },
+  {
+    "id": "87669b59-bf81-4def-8997-51733f571812",
+    "office": "School Canteen",
+    "title": "adwadeaqwedadawd",
+    "description": "adwadeaqwedadawd",
+    "mandatory": false,
+    "author": "Unknown",
+    "created_at": "2026-03-22T10:16:36.640646+00:00"
+  }
+]

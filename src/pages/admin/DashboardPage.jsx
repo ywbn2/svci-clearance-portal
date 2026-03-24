@@ -43,7 +43,7 @@ const DashboardPage = () => {
             <button onClick={() => navigate('/year-levels')} className="flex items-center gap-2 p-3 text-left border dark:border-slate-600 rounded-lg font-bold hover:bg-slate-50 dark:hover:bg-slate-700 dark:text-white transition text-xs"><CalendarIcon className="w-5 h-5 text-slate-500" /> Year Levels</button>
             <button onClick={() => navigate('/requirements')} className="flex items-center gap-2 p-3 text-left border dark:border-slate-600 rounded-lg font-bold hover:bg-slate-50 dark:hover:bg-slate-700 dark:text-white transition text-xs"><FileCheckIcon className="w-5 h-5 text-slate-500" /> Requirements</button>
             <button onClick={() => navigate('/logs')} className="flex items-center gap-2 p-3 text-left border dark:border-slate-600 rounded-lg font-bold hover:bg-slate-50 dark:hover:bg-slate-700 dark:text-white transition text-xs"><FileTextIcon className="w-5 h-5 text-slate-500" /> Audit Logs</button>
-            <button onClick={() => navigate('/eligible-students')} className="flex items-center gap-2 p-3 text-left border dark:border-slate-600 rounded-lg font-bold hover:bg-slate-50 dark:hover:bg-slate-700 dark:text-white transition text-xs"><ShieldIcon className="w-5 h-5 text-slate-500" /> Pre-Registered</button>
+            <button onClick={() => navigate('/eligible-students')} className="flex items-center gap-2 p-3 text-left border dark:border-slate-600 rounded-lg font-bold hover:bg-slate-50 dark:hover:bg-slate-700 dark:text-white transition text-xs col-span-2 lg:col-span-1"><ShieldIcon className="w-5 h-5 text-indigo-500" /> Student Registry</button>
           </div>
         </Card>
 
@@ -73,6 +73,40 @@ const DashboardPage = () => {
                 showToast(`${ids.length} audit log(s) cleared successfully.`);
               }
             }} className="w-full py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition">Clear All Logs</button>
+            <button onClick={async () => {
+              if (await showConfirm("WARNING: This will reset ALL students' clearances to PENDING and permanently delete ALL posted requirements for a new semester. Student accounts will NOT be deleted. Are you sure you want to start a new clearance period?", "Reset Semester", true)) {
+                
+                // 1. Chunked Update for Students
+                let hasStudentError = false;
+                const allIds = students.map(s => s.id);
+                if (allIds.length > 0) {
+                  for (let i = 0; i < allIds.length; i += 100) {
+                    const { error } = await supabase.from('students')
+                      .update({ office_clearances: {}, status: 'PENDING' })
+                      .in('id', allIds.slice(i, i + 100));
+                    if (error) hasStudentError = true;
+                  }
+                }
+
+                // 2. Chunked Delete for Requirements
+                let hasReqError = false;
+                const { data: reqIds } = await supabase.from('requirements').select('id');
+                if (reqIds && reqIds.length > 0) {
+                  const rIds = reqIds.map(r => r.id);
+                  for (let i = 0; i < rIds.length; i += 100) {
+                    const { error } = await supabase.from('requirements').delete().in('id', rIds.slice(i, i + 100));
+                    if (error) hasReqError = true;
+                  }
+                }
+
+                if (hasStudentError || hasReqError) {
+                  showToast("Semester reset completed with some errors.", "error");
+                } else {
+                  if (logAction) logAction({ name: 'Superadmin', roleType: 'Superadmin' }, `System Reset`, `Reset all student clearances and deleted all requirements for a new semester.`);
+                  showToast("Semester reset successfully. All clearances are now PENDING.");
+                }
+              }
+            }} className="w-full py-2 bg-white dark:bg-slate-800 border-2 border-indigo-300 dark:border-indigo-900/50 text-indigo-700 dark:text-indigo-400 font-bold rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition flex items-center justify-center gap-2"><CalendarIcon className="w-4 h-4" /> Reset Semester Clearances</button>
             
             <button onClick={async () => {
               const idsToPurge = students.filter(s => {

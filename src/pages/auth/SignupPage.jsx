@@ -9,11 +9,11 @@ import emailjs from '@emailjs/browser';
 const SignupPage = () => {
   const { darkMode, courses, departments, students, setStudents, yearLevels, currentUser, eligibleStudents } = useContext(AppContext);
   const navigate = useNavigate();
-  
+
   const [formData, setFormData] = useState({
     id: '', firstname: '', middlename: '', lastname: '', dob: '', gender: '', yearLevel: '', course: '', email: '', password: ''
   });
-  
+
   useEffect(() => {
     if (currentUser) {
       navigate('/', { replace: true });
@@ -39,13 +39,28 @@ const SignupPage = () => {
     if (!formData.id || !formData.firstname || !formData.lastname || !formData.yearLevel || !formData.course || !formData.email || !formData.password) {
       return setError("Please fill in all required fields (including Year Level).");
     }
-    
-    const preRegisteredStudent = eligibleStudents.find(s => s.school_id === formData.id);
-    if (!preRegisteredStudent) return setError("Security Error: This School ID was not found in the official registry. Please contact administration.");
 
-    const isFirstNameMatch = String(preRegisteredStudent.firstname).trim().toLowerCase() === formData.firstname.trim().toLowerCase();
-    const isLastNameMatch = String(preRegisteredStudent.lastname).trim().toLowerCase() === formData.lastname.trim().toLowerCase();
-    if (!isFirstNameMatch || !isLastNameMatch) return setError("Security Error: The First Name or Last Name does not match the official school records for this ID.");
+    // Step 1: Check if School ID is in the pre-approved registry
+    const inputId = String(formData.id || '').trim().toLowerCase();
+    const preRegisteredStudent = eligibleStudents.find(s => 
+      String(s.school_id || '').trim().toLowerCase() === inputId
+    );
+    
+    if (!preRegisteredStudent) return setError("This School ID is not in the registry. Please contact the administrator.");
+    
+    // Step 2: Strict Name Verification against registry (with robust string conversion)
+    const regFirst = String(preRegisteredStudent.firstname || '').toLowerCase().trim();
+    const regLast = String(preRegisteredStudent.lastname || '').toLowerCase().trim();
+    const formFirst = String(formData.firstname || '').toLowerCase().trim();
+    const formLast = String(formData.lastname || '').toLowerCase().trim();
+
+    if (regFirst !== formFirst || regLast !== formLast) {
+      return setError("The School ID and Name do not match our authorized registry. Please verify your details.");
+    }
+
+    // Step 3: Check if already registered
+    const existingAccount = students.find(s => s.id === formData.id && s.signup_date);
+    if (existingAccount) return setError("This School ID already has a registered account. Please log in instead.");
 
     setIsLoading(true);
     setError('');
@@ -74,19 +89,47 @@ const SignupPage = () => {
 
     const signupDate = new Date().toISOString().split('T')[0];
     const expirationDate = computeExpirationDate(signupDate, formData.yearLevel);
-    const updateData = {
-      name: fullName, firstname: formData.firstname.trim(), middlename: formData.middlename.trim() || null,
-      lastname: formData.lastname.trim(), dob: formData.dob || null, gender: formData.gender || null, yearLevel: formData.yearLevel,
-      course: formData.course, dept: assignedDept, email: formData.email, password: formData.password,
-      signup_date: signupDate, expiration_date: expirationDate, account_status: 'Active'
+    
+    // Explicitly add 'id' so upsert creates the row using the School ID as the primary key
+    const insertData = {
+      id: formData.id.trim(),
+      name: fullName, 
+      firstname: formData.firstname.trim(), 
+      middlename: formData.middlename.trim() || null,
+      lastname: formData.lastname.trim(), 
+      dob: formData.dob || null, 
+      gender: formData.gender || null, 
+      yearLevel: formData.yearLevel,
+      course: formData.course, 
+      dept: assignedDept, 
+      email: formData.email, 
+      password: formData.password,
+      signup_date: signupDate, 
+      expiration_date: expirationDate, 
+      account_status: 'Active',
+      status: 'PENDING'
     };
 
-    const { error: dbError } = await supabase.from('students').update(updateData).eq('id', formData.id);
+    // Use upsert instead of update so it creates the row if it doesn't exist
+    const { error: dbError } = await supabase.from('students').upsert(insertData);
     setIsLoading(false);
 
-    if (dbError) setError("Registration failed: " + dbError.message);
-    else {
-      setStudents(students.map(s => s.id === formData.id ? { ...s, ...updateData } : s));
+    if (dbError) {
+      setError("Registration failed: " + dbError.message);
+    } else {
+      // Safely append to the global students memory array so it shows up immediately in the Masterlist
+      if (typeof setStudents === 'function') {
+        setStudents(prev => {
+          const arr = Array.isArray(prev) ? prev : [];
+          const exists = arr.findIndex(s => s.id === formData.id);
+          if (exists > -1) {
+            const copy = [...arr];
+            copy[exists] = { ...copy[exists], ...insertData };
+            return copy;
+          }
+          return [...arr, insertData];
+        });
+      }
       setSuccess(true);
       setTimeout(() => navigate('/login'), 2500);
     }
@@ -104,7 +147,7 @@ const SignupPage = () => {
           {success && <div className="bg-emerald-100 text-emerald-800 p-3 rounded-lg text-sm font-bold mb-4">Verification successful! Redirecting...</div>}
           {!success && (
             <form onSubmit={handleVerifyAndSignup} className="space-y-4">
-              <input type="text" value={userCode} onChange={e=>setUserCode(e.target.value)} className="w-full p-4 text-center text-2xl tracking-widest border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" placeholder="000000" maxLength={6} required />
+              <input type="text" value={userCode} onChange={e => setUserCode(e.target.value)} className="w-full p-4 text-center text-2xl tracking-widest border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" placeholder="000000" maxLength={6} required />
               <button type="submit" disabled={isLoading} className="w-full py-3 bg-[#092B9C] hover:bg-blue-800 text-white font-bold rounded-xl shadow-md transition disabled:opacity-50">
                 {isLoading ? 'Verifying...' : 'Verify Email & Setup Account'}
               </button>
@@ -123,39 +166,39 @@ const SignupPage = () => {
           <h2 className="text-3xl font-black tracking-wider text-slate-800 dark:text-white">STUDENT<span className="text-[#092B9C] dark:text-blue-500">REGISTRATION</span></h2>
           <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Create your official clearance portal account</p>
         </div>
-        
+
         {error && <div className="bg-rose-100 text-rose-700 p-3 rounded-lg text-sm font-bold mb-4">{error}</div>}
         {success && <div className="bg-emerald-100 text-emerald-800 p-3 rounded-lg text-sm font-bold mb-4">Registration successful! Redirecting to login...</div>}
-        
+
         <form onSubmit={handleSendVerification} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-3">
               <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Student ID (School ID) <span className="text-rose-500">*</span></label>
-              <input type="text" value={formData.id} onChange={e=>setFormData({...formData, id: e.target.value})} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" placeholder="e.g. 2024-0001" required />
+              <input type="text" value={formData.id} onChange={e => setFormData({ ...formData, id: e.target.value })} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" placeholder="e.g. 2024-0001" required />
             </div>
-            
+
             <div>
               <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">First Name <span className="text-rose-500">*</span></label>
-              <input type="text" value={formData.firstname} onChange={e=>setFormData({...formData, firstname: e.target.value})} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" placeholder="First Name" required />
+              <input type="text" value={formData.firstname} onChange={e => setFormData({ ...formData, firstname: e.target.value })} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" placeholder="First Name" required />
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Last Name <span className="text-rose-500">*</span></label>
-              <input type="text" value={formData.lastname} onChange={e=>setFormData({...formData, lastname: e.target.value})} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" placeholder="Last Name" required />
+              <input type="text" value={formData.lastname} onChange={e => setFormData({ ...formData, lastname: e.target.value })} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" placeholder="Last Name" required />
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Middle Name <span className="text-slate-400 font-normal">(Optional)</span></label>
-              <input type="text" value={formData.middlename} onChange={e=>setFormData({...formData, middlename: e.target.value})} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" placeholder="Middle Name" />
+              <input type="text" value={formData.middlename} onChange={e => setFormData({ ...formData, middlename: e.target.value })} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" placeholder="Middle Name" />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Date of Birth</label>
-              <input type="date" value={formData.dob} onChange={e=>setFormData({...formData, dob: e.target.value})} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" />
+              <input type="date" value={formData.dob} onChange={e => setFormData({ ...formData, dob: e.target.value })} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" />
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Gender</label>
-              <select value={formData.gender} onChange={e=>setFormData({...formData, gender: e.target.value})} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none">
+              <select value={formData.gender} onChange={e => setFormData({ ...formData, gender: e.target.value })} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none">
                 <option value="">Select Gender</option>
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
@@ -163,7 +206,7 @@ const SignupPage = () => {
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Year Level <span className="text-rose-500">*</span></label>
-              <select value={formData.yearLevel} onChange={e=>setFormData({...formData, yearLevel: e.target.value})} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" required>
+              <select value={formData.yearLevel} onChange={e => setFormData({ ...formData, yearLevel: e.target.value })} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" required>
                 <option value="" disabled>Select Year</option>
                 {yearLevels.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
@@ -171,29 +214,29 @@ const SignupPage = () => {
           </div>
 
           <div className="border-t dark:border-slate-700 pt-6">
-             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Academic Course <span className="text-rose-500">*</span></label>
-             <select value={formData.course} onChange={e=>setFormData({...formData, course: e.target.value})} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" required>
-               <option value="" disabled>Select your course</option>
-               {courses.map(c => <option key={c.id} value={c.code}>{c.name} ({c.code})</option>)}
-             </select>
-             {formData.course && (
-               <p className="text-xs font-bold mt-2 text-emerald-600 dark:text-emerald-400">
-                 Assigned to: {getDepartmentForCourse(formData.course)}
-               </p>
-             )}
+            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Academic Course <span className="text-rose-500">*</span></label>
+            <select value={formData.course} onChange={e => setFormData({ ...formData, course: e.target.value })} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" required>
+              <option value="" disabled>Select your course</option>
+              {courses.map(c => <option key={c.id} value={c.code}>{c.name} ({c.code})</option>)}
+            </select>
+            {formData.course && (
+              <p className="text-xs font-bold mt-2 text-emerald-600 dark:text-emerald-400">
+                Assigned to: {getDepartmentForCourse(formData.course)}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t dark:border-slate-700 pt-6">
             <div>
               <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Email <span className="text-slate-500 dark:text-slate-400 font-normal">(for password resets)</span> <span className="text-rose-500">*</span></label>
-              <input type="email" value={formData.email} onChange={e=>setFormData({...formData, email: e.target.value})} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" placeholder="you@example.com" required />
+              <input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" placeholder="you@example.com" required />
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Password <span className="text-rose-500">*</span></label>
-              <input type="password" value={formData.password} onChange={e=>setFormData({...formData, password: e.target.value})} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" placeholder="••••••••" required />
+              <input type="password" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none" placeholder="••••••••" required />
             </div>
           </div>
-          
+
           <button type="submit" disabled={isLoading} className="w-full py-4 bg-[#092B9C] hover:bg-blue-800 text-white font-black text-lg rounded-xl shadow-lg transition mt-4 disabled:opacity-50">
             {isLoading ? 'Processing...' : 'Complete Registration'}
           </button>

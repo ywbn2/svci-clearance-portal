@@ -46,6 +46,7 @@ const DepartmentsPage = () => {
 
       if (oldDeptCode && oldDeptCode !== codeTrimmed) {
         supabase.from('students').update({ dept: codeTrimmed }).eq('dept', oldDeptCode || null).then();
+        supabase.from('signatories').update({ dept_code: codeTrimmed }).eq('dept_code', oldDeptCode || null).then();
       }
 
       supabase.from('departments').update({ name: nameTrimmed, code: codeTrimmed }).eq('id', editingDeptId).then(({error}) => {
@@ -86,6 +87,7 @@ const DepartmentsPage = () => {
       try {
         await supabase.from('department_courses').delete().eq('department_id', deptObj.id);
         await supabase.from('students').update({ dept: 'Unassigned' }).eq('dept', deptObj.code);
+        await supabase.from('signatories').update({ dept_code: 'Unassigned' }).eq('dept_code', deptObj.code);
         await supabase.from('departments').delete().eq('id', deptObj.id);
         showToast(`Department '${deptObj.code}' deleted.`, "error");
       } catch (err) {

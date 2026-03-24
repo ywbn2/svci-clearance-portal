@@ -55,10 +55,11 @@ const ForgotPasswordPage = () => {
 
     try {
       const templateParams = { to_email: email, to_name: matchedUser.name || matchedUser.firstname || "User", message: `Your password reset code is: ${code}` };
-      await emailjs.send('service_b37q2ub', 'template_gk42m8r', templateParams, 'hZ46URb2jaXrMXLME');
+      await emailjs.send('service_0r4tx49', 'template_gk42m8r', templateParams, 'hZ46URb2jaXrMXLME');
       setStep(1);
     } catch (err) {
-      setError("Failed to send email. Check EmailJS settings.");
+      console.error("EmailJS Error:", err);
+      setError("Failed to send email: " + (err.text || err.message || "Unknown error. Check EmailJS settings."));
     }
     setIsLoading(false);
   };

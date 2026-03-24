@@ -75,8 +75,8 @@ export const Sidebar = ({ isOpen, onClose }) => {
     { path: '/departments', icon: <BuildingIcon />, label: 'Departments' },
     { path: '/year-levels', icon: <CalendarIcon />, label: 'Year Levels' },
     { path: '/requirements', icon: <FileCheckIcon />, label: 'Requirements' },
+    { path: '/eligible-students', icon: <ShieldIcon />, label: 'Student Registry' },
     { path: '/logs', icon: <FileTextIcon />, label: 'Audit Logs' },
-    { path: '/eligible-students', icon: <ShieldIcon />, label: 'Pre-Registered' },
   ];
 
   const sidebarContent = (
@@ -159,9 +159,15 @@ export const Topbar = ({ onMenuToggle }) => {
       case '/': return 'Dashboard';
       case '/students': return 'Student Management';
       case '/signatories': return 'Signatories & Offices';
+      case '/admin': return 'Admin Users';
       case '/courses': return 'Courses Configuration';
       case '/departments': return 'Department Configuration';
-      default: return 'System Administration';
+      case '/year-levels': return 'Year Levels';
+      case '/requirements': return 'Requirements';
+      case '/logs': return 'Audit Logs';
+      case '/profile': return 'My Profile';
+      case '/eligible-students': return 'Student Registry';
+      default: return 'Clearance Portal';
     }
   };
 

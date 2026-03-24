@@ -211,16 +211,17 @@ const SignatoryStudentsPage = () => {
   };
 
   const handleKeySubmit = () => {
+    const localModalState = keyModalState; // capture before clearing
     const sigRecord = signatories.find(s => s.id === currentUser?.id || s.email === currentUser?.email);
     const storedKey = (sigRecord?.secret_key || '').trim();
     if (!keyInput.trim() || keyInput.trim() !== storedKey) {
       showToast('❌ Incorrect secret key. Action blocked.', 'error');
       setKeyModalState(null);
-      keyModalState?.resolve(false);
+      localModalState?.resolve(false);
       return;
     }
     setKeyModalState(null);
-    keyModalState?.resolve(true);
+    localModalState?.resolve(true);
   };
 
   const toggleClearance = async (student) => {
@@ -433,7 +434,7 @@ const SignatoryStudentsPage = () => {
               className="w-full p-3 mb-4 border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono tracking-widest"
             />
             <div className="flex gap-3">
-              <button onClick={() => { setKeyModalState(null); keyModalState?.resolve(false); }} className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl hover:bg-slate-200 transition">Cancel</button>
+              <button onClick={() => { const s = keyModalState; setKeyModalState(null); s?.resolve(false); }} className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl hover:bg-slate-200 transition">Cancel</button>
               <button onClick={handleKeySubmit} className="flex-1 py-2.5 bg-amber-500 text-white font-bold rounded-xl hover:bg-amber-600 transition shadow-md">Confirm</button>
             </div>
           </div>

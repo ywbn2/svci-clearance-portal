@@ -27,54 +27,67 @@ const InnerAppRoutes = () => {
   const isSignatory = currentUser?.roleType === 'Signatory';
 
   return (
-    <Router>
-      <Routes>
-        {/* Public routes */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+    <Routes>
+      {/* Public routes always available */}
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
-        {/* Student Routes */}
-        {isStudent && (
+      {/* If not logged in, show login page for all other routes */}
+      {!currentUser && (
+        <>
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </>
+      )}
+
+      {/* If logged in as student */}
+      {isStudent && (
+        <>
           <Route element={<StudentPortalLayout />}>
             <Route path="/" element={<StudentDashboardPage />} />
             <Route path="/profile" element={<StudentProfilePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
-        )}
+        </>
+      )}
 
-        {/* Admin/Signatory Routes */}
-        {!isStudent && (
-          <Route path="/*" element={
-            <ProtectedAdminLayout>
-              <Routes>
-                <Route path="/" element={
-                  isSignatory ? <SignatoryDashboardPage /> :
-                  <DashboardPage />
-                } />
-                <Route path="/profile" element={<StudentProfilePage />} />
-                <Route path="/students" element={isSignatory ? <SignatoryStudentsPage /> : <StudentsPage />} />
-                <Route path="/signatories" element={<SignatoriesPage />} />
-                <Route path="/admin" element={<AdminPage />} />
-                <Route path="/courses" element={<CoursesPage />} />
-                <Route path="/departments" element={<DepartmentsPage />} />
-                <Route path="/year-levels" element={<YearLevelsPage />} />
-                <Route path="/requirements" element={<RequirementsPage />} />
-                <Route path="/logs" element={<AuditLogsPage />} />
-                <Route path="/eligible-students" element={<EligibleStudentsPage />} />
-              </Routes>
-            </ProtectedAdminLayout>
-          } />
-        )}
-      </Routes>
-    </Router>
+      {/* If logged in as admin or signatory */}
+      {currentUser && !isStudent && (
+        <Route path="/*" element={
+          <ProtectedAdminLayout>
+            <Routes>
+              <Route path="/" element={
+                isSignatory ? <SignatoryDashboardPage /> : <DashboardPage />
+              } />
+              <Route path="/profile" element={<StudentProfilePage />} />
+              <Route path="/students" element={
+                isSignatory ? <SignatoryStudentsPage /> : <StudentsPage />
+              } />
+              {/* Admin-only routes — redirect signatories to dashboard */}
+              <Route path="/signatories" element={isSignatory ? <Navigate to="/" replace /> : <SignatoriesPage />} />
+              <Route path="/admin" element={isSignatory ? <Navigate to="/" replace /> : <AdminPage />} />
+              <Route path="/courses" element={isSignatory ? <Navigate to="/" replace /> : <CoursesPage />} />
+              <Route path="/departments" element={isSignatory ? <Navigate to="/" replace /> : <DepartmentsPage />} />
+              <Route path="/year-levels" element={isSignatory ? <Navigate to="/" replace /> : <YearLevelsPage />} />
+              {/* Shared routes */}
+              <Route path="/requirements" element={<RequirementsPage />} />
+              <Route path="/logs" element={<AuditLogsPage />} />
+              <Route path="/eligible-students" element={isSignatory ? <Navigate to="/" replace /> : <EligibleStudentsPage />} />
+            </Routes>
+          </ProtectedAdminLayout>
+        } />
+      )}
+    </Routes>
   );
 };
 
 export default function App() {
   return (
     <AppProvider>
-      <InnerAppRoutes />
+      <Router>
+        <InnerAppRoutes />
+      </Router>
     </AppProvider>
   );
 }

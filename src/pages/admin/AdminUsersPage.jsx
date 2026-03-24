@@ -6,7 +6,7 @@ import { Card } from '../../components/Navigation';
 import { Modal, ModalPortal } from '../../components/Navigation';
 
 const AdminPage = () => {
-  const { adminUsers, setAdminUsers, showToast, showConfirm, logAction, currentUser } = useContext(AppContext);
+  const { adminUsers, setAdminUsers, showToast, showConfirm, logAction, currentUser, setCurrentUser } = useContext(AppContext);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'Admin' });
@@ -29,6 +29,9 @@ const AdminPage = () => {
 
       if (editingId) {
         setAdminUsers(adminUsers.map(u => u.id === editingId ? { ...u, ...formData } : u));
+        if (editingId === currentUser?.id) {
+          setCurrentUser(prev => ({ ...prev, ...formData }));
+        }
         const { error } = await supabase.from('admin_users').update(formData).eq('id', editingId);
         if (error) { setAdminUsers(rollback); return showToast(`Failed: ${error.message}`, "error"); }
         showToast("Admin access settings updated.");
@@ -81,21 +84,30 @@ const AdminPage = () => {
               </tr>
             </thead>
             <tbody className="text-slate-700 dark:text-slate-300">
-              {adminUsers.map((user, idx) => (
-                <tr key={idx} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
-                  <td className="p-4 font-bold text-slate-900 dark:text-white">{user.name}</td>
-                  <td className="p-4 text-slate-500">{user.email}</td>
-                  <td className="p-4">
-                    <span className={`py-1 px-2 rounded-md text-xs font-bold ${user.role === 'Super Admin' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'}`}>
-                      {user.role}
-                    </span>
-                  </td>
-                  <td className="p-4 text-center space-x-3">
-                    <button onClick={() => handleOpenModal(user)} className="text-[#092B9C] dark:text-blue-400 font-bold hover:underline">Edit</button>
-                    <button onClick={() => handleDelete(user.id)} className="text-rose-500 font-bold hover:underline">Delete</button>
-                  </td>
-                </tr>
-              ))}
+              {adminUsers.map((user, idx) => {
+                // Protect the first Super Admin from deletion
+                const isPrimary = idx === 0 && user.role === 'Super Admin';
+                
+                return (
+                  <tr key={idx} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                    <td className="p-4 font-bold text-slate-900 dark:text-white">{user.name}</td>
+                    <td className="p-4 text-slate-500">{user.email}</td>
+                    <td className="p-4">
+                      <span className={`py-1 px-2 rounded-md text-xs font-bold ${user.role === 'Super Admin' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'}`}>
+                        {user.role}
+                      </span>
+                    </td>
+                    <td className="p-4 text-center space-x-3">
+                      <button onClick={() => handleOpenModal(user)} className="text-[#092B9C] dark:text-blue-400 font-bold hover:underline">Edit</button>
+                      {!isPrimary ? (
+                        <button onClick={() => handleDelete(user.id)} className="text-rose-500 font-bold hover:underline">Delete</button>
+                      ) : (
+                        <span className="text-slate-400 text-xs font-bold cursor-not-allowed uppercase" title="Primary account cannot be deleted">Protected</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
               {adminUsers.length === 0 && (
                 <tr>
                   <td colSpan="4" className="p-4 text-center text-slate-500">No admins registered yet.</td>
@@ -117,10 +129,22 @@ const AdminPage = () => {
               <input type="text" placeholder="Full Name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#092B9C]" />
               <input type="email" placeholder="Email Address" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#092B9C]" />
               <input type="password" placeholder="Password" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#092B9C]" />
-              <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#092B9C]">
-                <option value="Admin">Admin</option>
-                <option value="Super Admin">Super Admin</option>
-              </select>
+              
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase ml-1">Account Role</label>
+                <select 
+                  value={formData.role} 
+                  disabled={adminUsers[0]?.id === editingId && adminUsers[0]?.role === 'Super Admin'}
+                  onChange={e => setFormData({ ...formData, role: e.target.value })} 
+                  className={`w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#092B9C] ${(adminUsers[0]?.id === editingId && adminUsers[0]?.role === 'Super Admin') ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <option value="Admin">Admin</option>
+                  <option value="Super Admin">Super Admin</option>
+                </select>
+                {adminUsers[0]?.id === editingId && adminUsers[0]?.role === 'Super Admin' && (
+                  <p className="text-[10px] text-amber-600 font-bold ml-1 uppercase letter-spacing-wider">Primary Superadmin role is protected</p>
+                )}
+              </div>
             </div>
             
             <div className="flex gap-4">

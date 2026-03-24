@@ -43,31 +43,49 @@ export const AppProvider = ({ children }) => {
   const [globalChannel, setGlobalChannel] = useState(null);
   const [darkMode, setDarkMode] = useState(false);
   const [signingEnabled, setSigningEnabled] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Refs for debouncing must be at component level, not inside useEffect
+  const coursesRefreshTimeout = useRef(null);
+  const deptRefreshTimeout = useRef(null);
+  const eligibleTableExists = useRef(false); // tracks if eligible_students table is available
 
   useEffect(() => {
     const fetchSettings = async () => {
-      const { data } = await supabase.from('app_settings').select('signing_enabled, offices, office_categories, year_levels').eq('id', 1).single();
-      if (data) {
-        setSigningEnabled(data.signing_enabled);
-        if (data.offices) setOffices(data.offices);
-        if (data.office_categories) setOfficeCategories(data.office_categories);
-        if (data.year_levels && data.year_levels.length > 0) setYearLevels(data.year_levels);
+      try {
+        const { data, error } = await supabase.from('app_settings').select('signing_enabled, offices, office_categories, year_levels').eq('id', 1).single();
+        if (error) {
+          console.error('Error fetching app settings:', error);
+          return;
+        }
+        if (data) {
+          setSigningEnabled(data.signing_enabled);
+          if (data.offices) setOffices(data.offices);
+          if (data.office_categories) setOfficeCategories(data.office_categories);
+          if (data.year_levels && data.year_levels.length > 0) setYearLevels(data.year_levels);
+        }
+      } catch (error) {
+        console.error('Error in fetchSettings:', error);
       }
     };
     fetchSettings();
 
-    const settingsChannel = supabase.channel('rt-app-settings')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_settings' }, ({ new: row }) => {
-        if (row.id === 1) {
-          if (row.signing_enabled !== undefined) setSigningEnabled(row.signing_enabled);
-          if (row.offices) setOffices(row.offices);
-          if (row.office_categories) setOfficeCategories(row.office_categories);
-          if (row.year_levels && row.year_levels.length > 0) setYearLevels(row.year_levels);
-        }
-      })
-      .subscribe();
+    try {
+      const settingsChannel = supabase.channel('rt-app-settings')
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_settings' }, ({ new: row }) => {
+          if (row.id === 1) {
+            if (row.signing_enabled !== undefined) setSigningEnabled(row.signing_enabled);
+            if (row.offices) setOffices(row.offices);
+            if (row.office_categories) setOfficeCategories(row.office_categories);
+            if (row.year_levels && row.year_levels.length > 0) setYearLevels(row.year_levels);
+          }
+        })
+        .subscribe();
 
-    return () => supabase.removeChannel(settingsChannel);
+      return () => supabase.removeChannel(settingsChannel);
+    } catch (error) {
+      console.error('Error setting up settings channel:', error);
+    }
   }, []);
 
   const [courses, setCourses] = useState([]);
@@ -237,39 +255,60 @@ export const AppProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    let isMounted = true;
     const fetchData = async () => {
-      const [
-        { data: st }, { data: adminData }, { data: sigData },
-        { data: cData }, { data: dData }, { data: dcData }, { data: reqData }, { data: eligData }
-      ] = await Promise.all([
-        supabase.from('students').select('*'),
-        supabase.from('admin_users').select('*'),
-        supabase.from('signatories').select('*'),
-        supabase.from('courses').select('id, name, code'),
-        supabase.from('departments').select('*'),
-        supabase.from('department_courses').select('*'),
-        supabase.from('requirements').select('*'),
-        supabase.from('eligible_students').select('*')
-      ]);
+      try {
+        const [
+          { data: st, error: stErr }, { data: adminData, error: adminErr }, { data: sigData, error: sigErr },
+          { data: cData, error: cErr }, { data: dData, error: dErr }, { data: dcData, error: dcErr }, { data: reqData, error: reqErr }, { data: eligData, error: eligErr }
+        ] = await Promise.all([
+          supabase.from('students').select('*'),
+          supabase.from('admin_users').select('*'),
+          supabase.from('signatories').select('*'),
+          supabase.from('courses').select('id, name, code'),
+          supabase.from('departments').select('*'),
+          supabase.from('department_courses').select('*'),
+          supabase.from('requirements').select('*'),
+          supabase.from('eligible_students').select('*')
+        ]);
 
-      if (st) setStudents(st);
-      if (adminData) setAdminUsers(adminData);
-      if (sigData) setSignatories(sigData);
-      if (cData) setCourses(cData);
-      if (dData && dcData) {
-        setDepartments(dData.map(d => ({
-          id: d.id, name: d.name, code: d.code,
-          assignedCourses: dcData.filter(dc => dc.department_id === d.id).map(dc => dc.course_name)
-        })));
+        // Log errors but don't crash the app
+        if (stErr) console.error('Error fetching students:', stErr);
+        if (adminErr) console.error('Error fetching admin users:', adminErr);
+        if (sigErr) console.error('Error fetching signatories:', sigErr);
+        if (cErr) console.error('Error fetching courses:', cErr);
+        if (dErr) console.error('Error fetching departments:', dErr);
+        if (dcErr) console.error('Error fetching department courses:', dcErr);
+        if (reqErr) console.error('Error fetching requirements:', reqErr);
+        if (eligErr) console.warn('eligible_students table not found — feature disabled:', eligErr.message);
+
+        if (!isMounted) return;
+
+        // Set data if available
+        if (st) setStudents(st);
+        if (adminData) setAdminUsers(adminData);
+        if (sigData) setSignatories(sigData);
+        if (cData) setCourses(cData);
+        if (dData && dcData) {
+          setDepartments(dData.map(d => ({
+            id: d.id, name: d.name, code: d.code,
+            assignedCourses: dcData.filter(dc => dc.department_id === d.id).map(dc => dc.course_name)
+          })));
+        }
+        if (reqData) setRequirements(reqData);
+        if (eligData) { setEligibleStudents(eligData); eligibleTableExists.current = true; }
+        setIsInitialized(true);
+      } catch (error) {
+        console.error('Error fetching data from Supabase:', error);
+        // App continues with empty data - user can still login
+        setIsInitialized(true);
       }
-      if (reqData) setRequirements(reqData);
-      if (eligData) setEligibleStudents(eligData);
     };
     
     fetchData();
 
-    // --- NATIVE POSTGRES CHANGES: zero-delay real-time across all panels ---
-
+    // ── RESTORE REAL-TIME SUBSCRIPTIONS (Pre-Registered page removed) ──
+    
     const studentsChannel = supabase
       .channel('rt-students')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'students' }, ({ new: row }) => {
@@ -325,68 +364,66 @@ export const AppProvider = ({ children }) => {
       })
       .subscribe();
 
-    const eligChannel = supabase
-      .channel('rt-eligible-students')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'eligible_students' }, ({ new: row }) => {
-        setEligibleStudents(prev => prev.find(e => e.school_id === row.school_id) ? prev : [...prev, row]);
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'eligible_students' }, ({ new: row }) => {
-        setEligibleStudents(prev => prev.map(e => e.school_id === row.school_id ? row : e));
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'eligible_students' }, ({ old: row }) => {
-        setEligibleStudents(prev => prev.filter(e => e.school_id !== row.school_id));
-      })
-      .subscribe();
+    const refreshCoursesWithDebounce = () => {
+      if (coursesRefreshTimeout.current) clearTimeout(coursesRefreshTimeout.current);
+      coursesRefreshTimeout.current = setTimeout(async () => {
+        const { data } = await supabase.from('courses').select('id, name, code');
+        if (data) setCourses(data);
+      }, 300);
+    };
+
+    const refreshDepartmentsWithDebounce = () => {
+      if (deptRefreshTimeout.current) clearTimeout(deptRefreshTimeout.current);
+      deptRefreshTimeout.current = setTimeout(async () => {
+        const [{ data: dData }, { data: dcData }] = await Promise.all([
+          supabase.from('departments').select('*'),
+          supabase.from('department_courses').select('*')
+        ]);
+        if (dData && dcData) {
+          setDepartments(dData.map(d => ({
+            id: d.id, name: d.name, code: d.code,
+            assignedCourses: dcData.filter(dc => dc.department_id === d.id).map(dc => dc.course_name)
+          })));
+        }
+      }, 300);
+    };
 
     const coursesChannel = supabase
       .channel('rt-courses')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'courses' }, async () => {
-        const { data } = await supabase.from('courses').select('id, name, code');
-        if (data) setCourses(data);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'courses' }, () => {
+        refreshCoursesWithDebounce();
       })
       .subscribe();
 
     const deptChannel = supabase
       .channel('rt-departments')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'departments' }, async () => {
-        const [{ data: dData }, { data: dcData }] = await Promise.all([
-          supabase.from('departments').select('*'),
-          supabase.from('department_courses').select('*')
-        ]);
-        if (dData && dcData) {
-          setDepartments(dData.map(d => ({
-            id: d.id, name: d.name, code: d.code,
-            assignedCourses: dcData.filter(dc => dc.department_id === d.id).map(dc => dc.course_name)
-          })));
-        }
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'departments' }, () => {
+        refreshDepartmentsWithDebounce();
       })
       .subscribe();
 
     const deptCourseChannel = supabase
       .channel('rt-department-courses')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'department_courses' }, async () => {
-        const [{ data: dData }, { data: dcData }] = await Promise.all([
-          supabase.from('departments').select('*'),
-          supabase.from('department_courses').select('*')
-        ]);
-        if (dData && dcData) {
-          setDepartments(dData.map(d => ({
-            id: d.id, name: d.name, code: d.code,
-            assignedCourses: dcData.filter(dc => dc.department_id === d.id).map(dc => dc.course_name)
-          })));
-        }
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'department_courses' }, () => {
+        refreshDepartmentsWithDebounce();
       })
       .subscribe();
 
+    // Note: Eligible students real-time subscription removed to prevent
+    // infinite re-render loops and browser freezing. The admin will rely
+    // on manual refresh or page load to see the latest eligible list.
+
     return () => {
-      supabase.removeChannel(studentsChannel);
-      supabase.removeChannel(reqChannel);
-      supabase.removeChannel(sigChannel);
-      supabase.removeChannel(adminChannel);
-      supabase.removeChannel(coursesChannel);
-      supabase.removeChannel(deptChannel);
-      supabase.removeChannel(deptCourseChannel);
-      supabase.removeChannel(eligChannel);
+      isMounted = false;
+      if (coursesRefreshTimeout.current) clearTimeout(coursesRefreshTimeout.current);
+      if (deptRefreshTimeout.current) clearTimeout(deptRefreshTimeout.current);
+      if (studentsChannel) supabase.removeChannel(studentsChannel);
+      if (reqChannel) supabase.removeChannel(reqChannel);
+      if (sigChannel) supabase.removeChannel(sigChannel);
+      if (adminChannel) supabase.removeChannel(adminChannel);
+      if (coursesChannel) supabase.removeChannel(coursesChannel);
+      if (deptChannel) supabase.removeChannel(deptChannel);
+      if (deptCourseChannel) supabase.removeChannel(deptCourseChannel);
     };
   }, []);
 
@@ -401,8 +438,17 @@ export const AppProvider = ({ children }) => {
       adminUsers, setAdminUsers, eligibleStudents, setEligibleStudents, currentUser, setCurrentUser,
       toast, showToast, triggerGlobalSync, showConfirm, logAction
     }}>
-      <div className={`${darkMode ? 'dark' : ''} min-h-screen transition-colors duration-300 relative`}>
-        {children}
+      <div className={`${darkMode ? 'dark' : ''} min-h-screen transition-colors duration-300 relative bg-white dark:bg-slate-950`}>
+        {!isInitialized ? (
+          <div className="flex items-center justify-center min-h-screen bg-white dark:bg-slate-950">
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+            </div>
+          </div>
+        ) : (
+          children
+        )}
         {confirmDialog && (
           <Modal 
              isOpen={true} 

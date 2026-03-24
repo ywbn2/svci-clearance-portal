@@ -36,7 +36,7 @@ const LoginPage = () => {
       return navigate('/');
     }
 
-    setError("Invalid credentials. Try admin@example.com / password123 OR 2024-001 / password123");
+    setError("Invalid ID or password. Please check your credentials and try again.");
   };
 
   return (

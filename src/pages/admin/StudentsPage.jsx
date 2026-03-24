@@ -511,10 +511,10 @@ const StudentsPage = () => {
         </div>
       </div>
 
-      <div className="w-full border dark:border-slate-700 rounded-lg shadow-sm">
-        <table className="w-full text-left text-base">
+      <div className="w-full border dark:border-slate-700 rounded-lg shadow-sm overflow-x-auto custom-scrollbar">
+        <table className="w-full text-left text-base min-w-[1200px]">
           <thead className="bg-slate-100 dark:bg-slate-900/80 border-b dark:border-slate-700 text-slate-800 dark:text-slate-200">
-            <tr><th className="p-4">ID</th><th className="p-4">Name</th><th className="p-4">Course</th><th className="p-4">Year Level</th><th className="p-4">Department</th><th className="p-4">Clearance</th><th className="p-4">Account</th><th className="p-4">Expiration</th><th className="p-4">Remaining</th><th className="p-4 text-center">Actions</th></tr>
+            <tr><th className="p-4">ID</th><th className="p-4 " style={{ minWidth: '200px' }}>Name</th><th className="p-4">Course</th><th className="p-4">Year Level</th><th className="p-4">Department</th><th className="p-4">Clearance</th><th className="p-4">Account</th><th className="p-4">Expiration</th><th className="p-4">Remaining</th><th className="p-4 text-center">Actions</th></tr>
           </thead>
           <tbody className="text-slate-700 dark:text-slate-300">
             {filteredStudents.map((student, idx) => (

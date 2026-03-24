@@ -19,6 +19,7 @@ const SignatoriesPage = () => {
   const [editingOffice, setEditingOffice] = useState(null);
   const [editingCategory, setEditingCategory] = useState('School Clearance');
   const [editingOfficeName, setEditingOfficeName] = useState('');
+  const [isMigrating, setIsMigrating] = useState(false);
 
   const handleAddOffice = async () => {
     const trimmed = newOffice.trim();
@@ -53,7 +54,29 @@ const SignatoriesPage = () => {
 
       try {
         await supabase.from('signatories').update({ office: 'Unassigned' }).eq('office', officeName);
+        await supabase.from('requirements').delete().eq('office', officeName);
         await supabase.from('app_settings').update({ offices: newOffices, office_categories: newCats }).eq('id', 1);
+        
+        // CLEANUP: Remove this office key from all students' records
+        const studentsToCleanup = students.filter(s => s.office_clearances && s.office_clearances[officeName]);
+        if (studentsToCleanup.length > 0) {
+          const cleanupPromises = studentsToCleanup.map(s => {
+            const nextClearances = { ...s.office_clearances };
+            delete nextClearances[officeName];
+            return supabase.from('students').update({ office_clearances: nextClearances }).eq('id', s.id);
+          });
+          await Promise.all(cleanupPromises);
+          setStudents(prev => prev.map(s => {
+            if (s.office_clearances && s.office_clearances[officeName]) {
+              const next = { ...s.office_clearances };
+              delete next[officeName];
+              return { ...s, office_clearances: next };
+            }
+            return s;
+          }));
+        }
+
+        setRequirements(requirements.filter(r => r.office !== officeName));
         showToast(`Office '${officeName}' removed.`, "error");
       } catch (err) {
         setOffices(rollbackOffices);
@@ -66,6 +89,8 @@ const SignatoriesPage = () => {
 
   const handleSaveOfficeCategory = async (officeName) => {
     const newName = editingOfficeName.trim() || officeName;
+    if (!newName) return showToast("Office name cannot be empty", "error");
+    
     const nameChanged = newName !== officeName;
     // Rename in offices array if needed
     const newOffices = nameChanged ? offices.map(o => o === officeName ? newName : o) : offices;
@@ -77,16 +102,51 @@ const SignatoriesPage = () => {
     } else {
       newCats[officeName] = editingCategory;
     }
+    
     setOffices(newOffices);
     setOfficeCategories(newCats);
-    await supabase.from('app_settings').update({ offices: newOffices, office_categories: newCats }).eq('id', 1);
-    // Also update any signatories assigned to the old office name
-    if (nameChanged) {
-      await supabase.from('signatories').update({ office: newName }).eq('office', officeName);
-      setSignatories(signatories.map(s => s.office === officeName ? { ...s, office: newName } : s));
+    setIsMigrating(true);
+
+    try {
+      await supabase.from('app_settings').update({ offices: newOffices, office_categories: newCats }).eq('id', 1);
+      
+      // Also update any signatories assigned to the old office name
+      if (nameChanged) {
+        await supabase.from('signatories').update({ office: newName }).eq('office', officeName);
+        await supabase.from('requirements').update({ office: newName }).eq('office', officeName);
+        
+        // CRITICAL: Migrate student clearance keys
+        const studentsToUpdate = students.filter(s => s.office_clearances && s.office_clearances[officeName]);
+        if (studentsToUpdate.length > 0) {
+          const updates = studentsToUpdate.map(s => {
+            const nextClearances = { ...s.office_clearances };
+            nextClearances[newName] = nextClearances[officeName];
+            delete nextClearances[officeName];
+            return supabase.from('students').update({ office_clearances: nextClearances }).eq('id', s.id);
+          });
+          await Promise.all(updates);
+          
+          setStudents(prev => prev.map(s => {
+            if (s.office_clearances && s.office_clearances[officeName]) {
+              const next = { ...s.office_clearances };
+              next[newName] = next[officeName];
+              delete next[officeName];
+              return { ...s, office_clearances: next };
+            }
+            return s;
+          }));
+        }
+
+        setSignatories(signatories.map(s => s.office === officeName ? { ...s, office: newName } : s));
+        setRequirements(requirements.map(r => r.office === officeName ? { ...r, office: newName } : r));
+      }
+      showToast(`Office '${newName}' updated!`);
+    } catch (err) {
+      showToast("Sync Error: " + err.message, "error");
+    } finally {
+      setEditingOffice(null);
+      setIsMigrating(false);
     }
-    setEditingOffice(null);
-    showToast(`Office '${newName}' updated!`);
   };
 
   const handleOpenSigModal = (sig = null) => {

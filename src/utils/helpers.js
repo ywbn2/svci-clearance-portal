@@ -26,7 +26,11 @@ export const getRemainingDays = (expDate) => {
 // ────────────────────────────────────────────────────────────────
 export const getScopedOfficeName = (office, deptCode) => {
   if (!deptCode || !office) return office;
-  if (office.startsWith('Dept. ')) return `${deptCode} Department ${office.replace('Dept. ', '')}`;
+  
+  // If deptCode already ends with 'Department', don't add it again
+  const suffix = deptCode.toLowerCase().includes('department') ? '' : ' Department';
+  
+  if (office.startsWith('Dept. ')) return `${deptCode}${suffix} ${office.replace('Dept. ', '')}`;
   if (office === "Dean's Office") return `${deptCode} Dean's Office`;
   return office;
 };

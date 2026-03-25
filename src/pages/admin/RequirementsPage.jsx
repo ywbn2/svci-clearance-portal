@@ -53,7 +53,8 @@ const RequirementsPage = () => {
         office: assignedOffice,
         title: autoTitle,
         description: formData.description,
-        mandatory: formData.mandatory
+        mandatory: formData.mandatory,
+        dept_code: currentUser?.dept_code || null
       };
       
       const { data, error } = await supabase.from('requirements').insert([newReq]).select();

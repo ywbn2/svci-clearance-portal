@@ -25,14 +25,17 @@ const EligibleStudentsPage = () => {
     // If eligibleStudents is somehow undefined or not an array, default to empty array
     const list = Array.isArray(eligibleStudents) ? eligibleStudents : [];
     
+    // Always sort by family name A-Z
+    const sorted = [...list].sort((a, b) => (a.lastname || '').localeCompare(b.lastname || ''));
+
     if (!searchTerm) {
-      return list;
+      return sorted;
     }
     
     const search = searchTerm.toLowerCase().trim();
     
-    // Perform safe filter
-    const searchResults = list.filter(s => {
+    // Perform safe filter on already sorted list
+    return sorted.filter(s => {
       if (!s || typeof s !== 'object') return false;
       const idStr = String(s.school_id || '').toLowerCase();
       const firstStr = String(s.firstname || '').toLowerCase();
@@ -40,8 +43,6 @@ const EligibleStudentsPage = () => {
       
       return idStr.includes(search) || firstStr.includes(search) || lastStr.includes(search);
     });
-    
-    return searchResults;
   }, [eligibleStudents, searchTerm]);
 
   const totalFiltered = filtered.length;

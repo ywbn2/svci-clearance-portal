@@ -24,7 +24,7 @@ const SignatoryStudentsPage = () => {
   const isDeptSpecific = ['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(currentUser?.role) || ['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(currentUser?.office);
   const userDept = (currentUser?.dept_code || '').trim().toLowerCase();
   const visibleStudents = isDeptSpecific && currentUser?.dept_code 
-    ? students.filter(s => (s.dept || '').trim().toLowerCase() === userDept) 
+    ? students.filter(s => (s.department || '').trim().toLowerCase() === userDept) 
     : students;
 
   const filtered = visibleStudents.filter(s => {
@@ -33,9 +33,9 @@ const SignatoryStudentsPage = () => {
     const matchStatus = activeStatusFilters.length === 0 || activeStatusFilters.includes(clearanceStatus);
     const matchCourse = activeCourseFilters.length === 0 || activeCourseFilters.includes(s.course);
     const matchYear = activeYearFilters.length === 0 || activeYearFilters.includes(s.yearLevel);
-    const matchDept = activeDeptFilters.length === 0 || activeDeptFilters.includes(s.dept);
+    const matchDept = activeDeptFilters.length === 0 || activeDeptFilters.includes(s.department);
     return matchSearch && matchStatus && matchCourse && matchYear && matchDept;
-  });
+  }).sort((a, b) => (a.lastname || '').localeCompare(b.lastname || ''));
 
   const toggleSelection = (id) => {
     if (selectedStudents.includes(id)) {
@@ -75,7 +75,7 @@ const SignatoryStudentsPage = () => {
           s.id || '—',
           s.name || `${s.firstname || ''} ${s.lastname || ''}`.trim() || '—',
           s.course || '—',
-          s.dept || '—',
+          s.department || '—',
           s.yearLevel || '—',
           s.account_status || 'Active',
           isSigned ? 'Signed' : 'Unsigned'
@@ -107,96 +107,100 @@ const SignatoryStudentsPage = () => {
   };
 
   const handleBulkAction = async (actionType) => {
-    // Secret key verification first
-    const keyConfirmed = await requestSecretKey({ name: `${selectedStudents.length} selected student(s)`, office_clearances: {} });
-    if (!keyConfirmed) return;
+    const enteredKey = await requestSecretKey({ name: `${selectedStudents.length} selected student(s)`, office_clearances: {} });
+    if (!enteredKey) return;
 
     const actionName = actionType === 'Cleared' ? 'approve' : 'remove approval for';
     if (await showConfirm(`Are you sure you want to ${actionName} clearance for ${selectedStudents.length} selected students at once?`)) {
       const office = currentUser?.office;
-      const updates = selectedStudents.map(id => {
-        const student = students.find(s => s.id === id);
-        const newClearances = { ...(student?.office_clearances || {}), [office]: actionType };
-        return supabase.from('students').update({ office_clearances: newClearances }).eq('id', id);
+      
+      const { data, error } = await supabase.rpc('verify_and_bulk_sign_clearance', {
+        p_signatory_email: currentUser?.email,
+        p_student_ids: selectedStudents,
+        p_entered_key: enteredKey,
+        p_office_name: office,
+        p_action: actionType
       });
-      const results = await Promise.all(updates);
-      const hasError = results.some(r => r.error);
-      if (hasError) {
-        showToast('Some updates failed. Please refresh and try again.', 'error');
-      } else {
-        setStudents(students.map(s => {
+
+      if (error) {
+        showToast(error.message, 'error');
+      } else if (data.success) {
+        setStudents(prev => prev.map(s => {
           if (!selectedStudents.includes(s.id)) return s;
-          const newClearances = { ...(s.office_clearances || {}), [office]: actionType };
-          return { ...s, office_clearances: newClearances };
+          return { ...s, office_clearances: { ...(s.office_clearances || {}), [office]: actionType } };
         }));
-        const studentNames = selectedStudents
-          .map(id => students.find(s => s.id === id))
-          .filter(Boolean)
-          .map(s => `${s.name} (${s.id})`)
-          .join(', ');
-        showToast(`Successfully ${actionType === 'Cleared' ? 'approved' : 'revoked'} ${selectedStudents.length} students!`);
+        
+        showToast(data.message);
         const bulkActionLabel = actionType === 'Cleared' ? 'Bulk Approved Clearance' : 'Bulk Revoked Clearance';
-        if (logAction) logAction(currentUser, bulkActionLabel, `Office: ${office} | ${selectedStudents.length} students: ${studentNames}`);
+        if (logAction) logAction(currentUser, bulkActionLabel, `Office: ${office} | ${selectedStudents.length} students updated`);
         setSelectedStudents([]);
+      } else {
+        showToast(data.message, 'error');
       }
     }
   };
 
   const handleApproveAll = async () => {
     if (filtered.length === 0) return showToast('No students to approve.', 'error');
-    const keyConfirmed = await requestSecretKey({ name: `all ${filtered.length} displayed student(s)`, office_clearances: {} });
-    if (!keyConfirmed) return;
+    const enteredKey = await requestSecretKey({ name: `all ${filtered.length} displayed student(s)`, office_clearances: {} });
+    if (!enteredKey) return;
     if (!await showConfirm(`Approve clearance for ALL ${filtered.length} displayed students at ${currentUser?.office}? This cannot be undone easily.`)) return;
 
     const office = currentUser?.office;
-    const toUpdate = filtered.filter(s => (s.office_clearances?.[office] || 'Pending') !== 'Cleared');
-    if (toUpdate.length === 0) return showToast('All displayed students are already approved!', 'error');
+    const toUpdateIds = filtered.filter(s => (s.office_clearances?.[office] || 'Pending') !== 'Cleared').map(s => s.id);
+    if (toUpdateIds.length === 0) return showToast('All displayed students are already approved!', 'error');
 
-    const updates = toUpdate.map(s => {
-      const newClearances = { ...(s.office_clearances || {}), [office]: 'Cleared' };
-      return supabase.from('students').update({ office_clearances: newClearances }).eq('id', s.id);
+    const { data, error } = await supabase.rpc('verify_and_bulk_sign_clearance', {
+      p_signatory_email: currentUser?.email,
+      p_student_ids: toUpdateIds,
+      p_entered_key: enteredKey,
+      p_office_name: office,
+      p_action: 'Cleared'
     });
-    const results = await Promise.all(updates);
-    const hasError = results.some(r => r.error);
-    if (hasError) {
-      showToast('Some updates failed. Please refresh and try again.', 'error');
-    } else {
-      const updatedIds = new Set(toUpdate.map(s => s.id));
-      setStudents(students.map(s => {
-        if (!updatedIds.has(s.id)) return s;
+
+    if (error) {
+      showToast(error.message, 'error');
+    } else if (data.success) {
+      setStudents(prev => prev.map(s => {
+        if (!toUpdateIds.includes(s.id)) return s;
         return { ...s, office_clearances: { ...(s.office_clearances || {}), [office]: 'Cleared' } };
       }));
-      showToast(`✅ Approved clearance for ${toUpdate.length} students!`);
-      if (logAction) logAction(currentUser, 'Bulk Approved All', `Office: ${office} | Approved ${toUpdate.length} displayed students`);
+      showToast(`✅ Approved clearance for ${toUpdateIds.length} students!`);
+      if (logAction) logAction(currentUser, 'Bulk Approved All', `Office: ${office} | Approved ${toUpdateIds.length} students`);
+    } else {
+      showToast(data.message, 'error');
     }
   };
 
   const handleRevokeAll = async () => {
     if (filtered.length === 0) return showToast('No students to revoke.', 'error');
-    const keyConfirmed = await requestSecretKey({ name: `all ${filtered.length} displayed student(s)`, office_clearances: { [currentUser?.office]: 'Cleared' } });
-    if (!keyConfirmed) return;
+    const enteredKey = await requestSecretKey({ name: `all ${filtered.length} displayed student(s)`, office_clearances: { [currentUser?.office]: 'Cleared' } });
+    if (!enteredKey) return;
     if (!await showConfirm(`Remove clearance approval for ALL ${filtered.length} displayed students at ${currentUser?.office}? This is a major action.`, 'Confirm Revoke All', true)) return;
 
     const office = currentUser?.office;
-    const toUpdate = filtered.filter(s => (s.office_clearances?.[office] || 'Pending') === 'Cleared');
-    if (toUpdate.length === 0) return showToast('No approved students in the current view to revoke.', 'error');
+    const toUpdateIds = filtered.filter(s => (s.office_clearances?.[office] || 'Pending') === 'Cleared').map(s => s.id);
+    if (toUpdateIds.length === 0) return showToast('No approved students in the current view to revoke.', 'error');
 
-    const updates = toUpdate.map(s => {
-      const newClearances = { ...(s.office_clearances || {}), [office]: 'Pending' };
-      return supabase.from('students').update({ office_clearances: newClearances }).eq('id', s.id);
+    const { data, error } = await supabase.rpc('verify_and_bulk_sign_clearance', {
+      p_signatory_email: currentUser?.email,
+      p_student_ids: toUpdateIds,
+      p_entered_key: enteredKey,
+      p_office_name: office,
+      p_action: 'Pending'
     });
-    const results = await Promise.all(updates);
-    const hasError = results.some(r => r.error);
-    if (hasError) {
-      showToast('Some updates failed. Please refresh and try again.', 'error');
-    } else {
-      const updatedIds = new Set(toUpdate.map(s => s.id));
-      setStudents(students.map(s => {
-        if (!updatedIds.has(s.id)) return s;
+
+    if (error) {
+      showToast(error.message, 'error');
+    } else if (data.success) {
+      setStudents(prev => prev.map(s => {
+        if (!toUpdateIds.includes(s.id)) return s;
         return { ...s, office_clearances: { ...(s.office_clearances || {}), [office]: 'Pending' } };
       }));
-      showToast(`Revoked clearance for ${toUpdate.length} students.`, 'error');
-      if (logAction) logAction(currentUser, 'Bulk Revoked All', `Office: ${office} | Revoked ${toUpdate.length} displayed students`);
+      showToast(`Revoked clearance for ${toUpdateIds.length} students.`, 'error');
+      if (logAction) logAction(currentUser, 'Bulk Revoked All', `Office: ${office} | Revoked ${toUpdateIds.length} students`);
+    } else {
+      showToast(data.message, 'error');
     }
   };
 
@@ -211,34 +215,36 @@ const SignatoryStudentsPage = () => {
   };
 
   const handleKeySubmit = () => {
-    const localModalState = keyModalState; // capture before clearing
-    const sigRecord = signatories.find(s => s.id === currentUser?.id || s.email === currentUser?.email);
-    const storedKey = (sigRecord?.secret_key || '').trim();
-    if (!keyInput.trim() || keyInput.trim() !== storedKey) {
-      showToast('❌ Incorrect secret key. Action blocked.', 'error');
-      setKeyModalState(null);
-      localModalState?.resolve(false);
-      return;
-    }
+    const localModalState = keyModalState;
     setKeyModalState(null);
-    localModalState?.resolve(true);
+    localModalState?.resolve(keyInput); // Resolve with the entered key
   };
 
   const toggleClearance = async (student) => {
-    const confirmed = await requestSecretKey(student);
-    if (!confirmed) return;
+    const enteredKey = await requestSecretKey(student);
+    if (!enteredKey) return;
+    
     const office = currentUser?.office;
-    const currentOfficeClearance = student.office_clearances?.[office] || 'Pending';
-    const newOfficeClearance = currentOfficeClearance === 'Pending' ? 'Cleared' : 'Pending';
-    const newClearances = { ...(student.office_clearances || {}), [office]: newOfficeClearance };
-    const { error } = await supabase.from('students').update({ office_clearances: newClearances }).eq('id', student.id);
-    if (!error) {
-      setStudents(students.map(s => s.id === student.id ? { ...s, office_clearances: newClearances } : s));
-      showToast(`${student.name} — ${office}: ${newOfficeClearance}!`);
-      const actionLabel = newOfficeClearance === 'Cleared' ? 'Approved Clearance' : 'Revoked Clearance';
-      if (logAction) logAction(currentUser, actionLabel, `Student: ${student.name} (${student.id}) — Office: ${office} → ${newOfficeClearance}`);
+    const currentStatus = student.office_clearances?.[office] || 'Pending';
+    const newStatus = currentStatus === 'Pending' ? 'Cleared' : 'Pending';
+
+    const { data, error } = await supabase.rpc('verify_and_sign_clearance', {
+      p_signatory_email: currentUser?.email,
+      p_student_id: student.id,
+      p_entered_key: enteredKey,
+      p_office_name: office,
+      p_action: newStatus
+    });
+
+    if (error) {
+      showToast(error.message, 'error');
+    } else if (data.success) {
+      setStudents(prev => prev.map(s => s.id === student.id ? { ...s, office_clearances: { ...(s.office_clearances || {}), [office]: newStatus } } : s));
+      showToast(`${student.name} — ${office}: ${newStatus}!`);
+      const actionLabel = newStatus === 'Cleared' ? 'Approved Clearance' : 'Revoked Clearance';
+      if (logAction) logAction(currentUser, actionLabel, `Student: ${student.name} (${student.id}) — Office: ${office} → ${newStatus}`);
     } else {
-      showToast('Failed to update status', 'error');
+      showToast(data.message, 'error');
     }
   };
 

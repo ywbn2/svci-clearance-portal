@@ -42,10 +42,10 @@ const DepartmentsPage = () => {
       const rollbackStudents = [...students];
 
       setDepartments(departments.map(d => d.id === editingDeptId ? { ...d, name: nameTrimmed, code: codeTrimmed } : d));
-      setStudents(students.map(s => s.dept === oldDeptCode ? {...s, dept: codeTrimmed} : s));
+      setStudents(students.map(s => s.department === oldDeptCode ? {...s, department: codeTrimmed} : s));
 
       if (oldDeptCode && oldDeptCode !== codeTrimmed) {
-        supabase.from('students').update({ dept: codeTrimmed }).eq('dept', oldDeptCode || null).then();
+        supabase.from('students').update({ department: codeTrimmed }).eq('department', oldDeptCode || null).then();
         supabase.from('signatories').update({ dept_code: codeTrimmed }).eq('dept_code', oldDeptCode || null).then();
       }
 
@@ -82,11 +82,11 @@ const DepartmentsPage = () => {
       const rollbackStudents = [...students];
 
       setDepartments(departments.filter(d => d.id !== deptObj.id));
-      setStudents(students.map(s => s.dept === deptObj.code ? {...s, dept: 'Unassigned'} : s));
+      setStudents(students.map(s => s.department === deptObj.code ? {...s, department: 'Unassigned'} : s));
 
       try {
         await supabase.from('department_courses').delete().eq('department_id', deptObj.id);
-        await supabase.from('students').update({ dept: 'Unassigned' }).eq('dept', deptObj.code);
+        await supabase.from('students').update({ department: 'Unassigned' }).eq('department', deptObj.code);
         await supabase.from('signatories').update({ dept_code: 'Unassigned' }).eq('dept_code', deptObj.code);
         await supabase.from('departments').delete().eq('id', deptObj.id);
         showToast(`Department '${deptObj.code}' deleted.`, "error");
@@ -122,16 +122,16 @@ const DepartmentsPage = () => {
 
     // Fire safety sync to resolve orphaned students automatically
     if (removedCourses.length > 0) {
-      await supabase.from('students').update({ dept: 'Unassigned' }).in('course', removedCourses);
+      await supabase.from('students').update({ department: 'Unassigned' }).in('course', removedCourses);
     }
     if (addedCourses.length > 0) {
-      await supabase.from('students').update({ dept: assigningDept.code }).in('course', addedCourses);
+      await supabase.from('students').update({ department: assigningDept.code }).in('course', addedCourses);
     }
 
     // Cascade visuals directly without latency
     setStudents(students.map(s => {
-      if (removedCourses.includes(s.course)) return { ...s, dept: 'Unassigned' };
-      if (addedCourses.includes(s.course)) return { ...s, dept: assigningDept.code };
+      if (removedCourses.includes(s.course)) return { ...s, department: 'Unassigned' };
+      if (addedCourses.includes(s.course)) return { ...s, department: assigningDept.code };
       return s;
     }));
 

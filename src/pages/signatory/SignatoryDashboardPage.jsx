@@ -10,7 +10,7 @@ const SignatoryDashboardPage = () => {
   const isDeptSpecific = ['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(currentUser?.role) || ['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(currentUser?.office);
   const userDept = (currentUser?.dept_code || '').trim().toLowerCase();
   const visibleStudents = isDeptSpecific && currentUser?.dept_code 
-    ? students.filter(s => (s.dept || '').trim().toLowerCase() === userDept) 
+    ? students.filter(s => (s.department || '').trim().toLowerCase() === userDept) 
     : students;
     
   const pendingRequests = visibleStudents.filter(s => (s.office_clearances?.[currentUser?.office] || 'Pending') === 'Pending').length;

@@ -258,13 +258,10 @@ export const AppProvider = ({ children }) => {
     let isMounted = true;
     const fetchData = async () => {
       try {
-        const [
-          { data: st, error: stErr }, { data: adminData, error: adminErr }, { data: sigData, error: sigErr },
-          { data: cData, error: cErr }, { data: dData, error: dErr }, { data: dcData, error: dcErr }, { data: reqData, error: reqErr }, { data: eligData, error: eligErr }
-        ] = await Promise.all([
+        const fetchResults = await Promise.allSettled([
           supabase.from('students').select('*'),
           supabase.from('admin_users').select('*'),
-          supabase.from('signatories').select('*'),
+          supabase.from('signatories').select('id, email, name, role, office, dept_code'),
           supabase.from('courses').select('id, name, code'),
           supabase.from('departments').select('*'),
           supabase.from('department_courses').select('*'),
@@ -272,31 +269,35 @@ export const AppProvider = ({ children }) => {
           supabase.from('eligible_students').select('*')
         ]);
 
-        // Log errors but don't crash the app
-        if (stErr) console.error('Error fetching students:', stErr);
-        if (adminErr) console.error('Error fetching admin users:', adminErr);
-        if (sigErr) console.error('Error fetching signatories:', sigErr);
-        if (cErr) console.error('Error fetching courses:', cErr);
-        if (dErr) console.error('Error fetching departments:', dErr);
-        if (dcErr) console.error('Error fetching department courses:', dcErr);
-        if (reqErr) console.error('Error fetching requirements:', reqErr);
-        if (eligErr) console.warn('eligible_students table not found — feature disabled:', eligErr.message);
-
         if (!isMounted) return;
 
-        // Set data if available
-        if (st) setStudents(st);
-        if (adminData) setAdminUsers(adminData);
-        if (sigData) setSignatories(sigData);
-        if (cData) setCourses(cData);
-        if (dData && dcData) {
+        const [
+          stRes, adminRes, sigRes, 
+          cRes, dRes, dcRes, reqRes, eligRes
+        ] = fetchResults;
+
+        // Extract data and log errors if any
+        if (stRes.status === 'fulfilled' && !stRes.value.error) setStudents(stRes.value.data);
+        else if (stRes.status === 'fulfilled' && stRes.value.error) console.warn('Students restricted:', stRes.value.error.message);
+
+        if (adminRes.status === 'fulfilled' && !adminRes.value.error) setAdminUsers(adminRes.value.data);
+        if (sigRes.status === 'fulfilled' && !sigRes.value.error) setSignatories(sigRes.value.data);
+        if (cRes.status === 'fulfilled' && !cRes.value.error) setCourses(cRes.value.data);
+        
+        if (dRes.status === 'fulfilled' && !dRes.value.error && dcRes.status === 'fulfilled' && !dcRes.value.error) {
+          const dData = dRes.value.data;
+          const dcData = dcRes.value.data;
           setDepartments(dData.map(d => ({
             id: d.id, name: d.name, code: d.code,
             assignedCourses: dcData.filter(dc => dc.department_id === d.id).map(dc => dc.course_name)
           })));
         }
-        if (reqData) setRequirements(reqData);
-        if (eligData) { setEligibleStudents(eligData); eligibleTableExists.current = true; }
+
+        if (reqRes.status === 'fulfilled' && !reqRes.value.error) setRequirements(reqRes.value.data);
+        if (eligRes.status === 'fulfilled' && !eligRes.value.error) {
+          setEligibleStudents(eligRes.value.data);
+          eligibleTableExists.current = true;
+        }
         setIsInitialized(true);
       } catch (error) {
         console.error('Error fetching data from Supabase:', error);

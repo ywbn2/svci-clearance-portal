@@ -30,14 +30,46 @@ const SignatoriesPage = () => {
       } else {
         const newOffices = [...offices, trimmed];
         const newCats = { ...officeCategories, [trimmed]: newOfficeCategory };
+        
+        // Optimistic UI Update
         setOffices(newOffices);
         setOfficeCategories(newCats);
-        await supabase.from('app_settings').update({ offices: newOffices, office_categories: newCats }).eq('id', 1);
-        setNewOffice(''); setShowAddOffice(false);
-        showToast(`Office '${trimmed}' added!`);
+        setShowAddOffice(false);
+        setNewOffice('');
+
+        try {
+          // 1. Update app_settings
+          await supabase.from('app_settings').update({ offices: newOffices, office_categories: newCats }).eq('id', 1);
+          
+          // 2. IMPORTANT: Initialize this office for ALL students
+          // This ensures signing and status calculation works for the new office immediately
+          const studentsWithClearance = students.filter(s => s.office_clearances);
+          if (studentsWithClearance.length > 0) {
+            const batchSize = 50;
+            for (let i = 0; i < studentsWithClearance.length; i += batchSize) {
+              const batch = studentsWithClearance.slice(i, i + batchSize);
+              const promises = batch.map(s => {
+                const nextClearances = { ...(s.office_clearances || {}), [trimmed]: 'Pending' };
+                return supabase.from('students').update({ office_clearances: nextClearances }).eq('id', s.id);
+              });
+              await Promise.all(promises);
+            }
+            
+            // Sync local state
+            setStudents(prev => prev.map(s => ({
+              ...s,
+              office_clearances: { ...(s.office_clearances || {}), [trimmed]: 'Pending' }
+            })));
+          }
+          
+          showToast(`Office '${trimmed}' added and initialized for all students!`);
+        } catch (err) {
+          showToast(`Office added but student sync failed: ${err.message}`, "error");
+        }
       }
     }
   };
+
   const handleDeleteOffice = async (officeName) => {
     if (await showConfirm(`Are you sure you want to delete the ${officeName} office? Signatories assigned here will become Unassigned.`)) {
       const rollbackOffices = [...offices];
@@ -222,7 +254,7 @@ const SignatoriesPage = () => {
 
         const isDeptSpecific = ['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sig.role) || ['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sig.office);
         const targetStudents = isDeptSpecific && sig.dept_code 
-          ? students.filter(s => (s.dept || '').trim().toLowerCase() === (sig.dept_code || '').trim().toLowerCase())
+          ? students.filter(s => (s.department || '').trim().toLowerCase() === (sig.dept_code || '').trim().toLowerCase())
           : students;
 
         if (targetStudents.length > 0) {
@@ -266,6 +298,63 @@ const SignatoriesPage = () => {
     }
   };
 
+  const renderOfficeCard = (office) => (
+    <div key={office} className="relative group rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all duration-200 p-3 flex flex-col gap-2">
+      {editingOffice === office ? (
+        <div className="space-y-2 animate-fade-in">
+          <input
+            type="text"
+            value={editingOfficeName}
+            onChange={e => setEditingOfficeName(e.target.value)}
+            className="w-full p-1.5 text-xs border dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#092B9C] font-bold"
+            placeholder="Office name"
+          />
+          <select
+            value={editingCategory}
+            onChange={e => setEditingCategory(e.target.value)}
+            className="w-full p-1.5 text-xs border dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#092B9C]"
+          >
+            <option value="School Clearance">School Clearance</option>
+            <option value="SSG Clearance">SSG Clearance</option>
+          </select>
+          <div className="flex gap-1">
+            <button onClick={() => handleSaveOfficeCategory(office)} className="flex-1 py-1 bg-[#092B9C] text-white text-xs font-bold rounded-lg hover:bg-blue-800 transition">Save</button>
+            <button onClick={() => setEditingOffice(null)} className="flex-1 py-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-300 transition">✕</button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-start gap-2 min-w-0">
+            <BuildingIcon className="w-5 h-5 text-slate-400 mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <p className="font-bold text-slate-800 dark:text-white text-sm leading-tight truncate" title={office}>{office}</p>
+              <span className={`text-xs uppercase font-bold px-2 py-0.5 rounded-full mt-1 inline-block ${officeCategories[office] === 'SSG Clearance' ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'}`}>
+                {officeCategories[office] || 'School'}
+              </span>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">{signatories.filter(s => s.office === office).length} staff</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 mt-auto pt-1 border-t border-slate-100 dark:border-slate-800">
+            <button
+              onClick={() => { setEditingOffice(office); setEditingCategory(officeCategories[office] || 'School Clearance'); setEditingOfficeName(office); }}
+              className="flex-1 flex items-center justify-center p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition"
+              title="Edit Category"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button
+              onClick={() => handleDeleteOffice(office)}
+              className="flex-1 flex items-center justify-center p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition"
+              title="Delete Office"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-8 animate-fade-in">
       <div>
@@ -282,63 +371,28 @@ const SignatoriesPage = () => {
         {offices.length === 0 ? (
           <p className="text-slate-400 dark:text-slate-500 italic text-sm text-center py-8">No offices have been added yet. Click "Add Office" to get started.</p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {offices.map((office, idx) => (
-              <div key={idx} className="relative group rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all duration-200 p-3 flex flex-col gap-2">
-                {editingOffice === office ? (
-                  <div className="space-y-2 animate-fade-in">
-                    <input
-                      type="text"
-                      value={editingOfficeName}
-                      onChange={e => setEditingOfficeName(e.target.value)}
-                      className="w-full p-1.5 text-xs border dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#092B9C] font-bold"
-                      placeholder="Office name"
-                    />
-                    <select
-                      value={editingCategory}
-                      onChange={e => setEditingCategory(e.target.value)}
-                      className="w-full p-1.5 text-xs border dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#092B9C]"
-                    >
-                      <option value="School Clearance">School Clearance</option>
-                      <option value="SSG Clearance">SSG Clearance</option>
-                    </select>
-                    <div className="flex gap-1">
-                      <button onClick={() => handleSaveOfficeCategory(office)} className="flex-1 py-1 bg-[#092B9C] text-white text-xs font-bold rounded-lg hover:bg-blue-800 transition">Save</button>
-                      <button onClick={() => setEditingOffice(null)} className="flex-1 py-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-300 transition">✕</button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-start gap-2 min-w-0">
-                      <BuildingIcon className="w-5 h-5 text-slate-400 mt-0.5 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="font-bold text-slate-800 dark:text-white text-sm leading-tight truncate" title={office}>{office}</p>
-                        <span className={`text-xs uppercase font-bold px-2 py-0.5 rounded-full mt-1 inline-block ${officeCategories[office] === 'SSG Clearance' ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'}`}>
-                          {officeCategories[office] || 'School'}
-                        </span>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">{signatories.filter(s => s.office === office).length} staff</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 mt-auto pt-1 border-t border-slate-100 dark:border-slate-800">
-                      <button
-                        onClick={() => { setEditingOffice(office); setEditingCategory(officeCategories[office] || 'School Clearance'); setEditingOfficeName(office); }}
-                        className="flex-1 flex items-center justify-center p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition"
-                        title="Edit Category"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                      </button>
-                      <button
-                        onClick={() => handleDeleteOffice(office)}
-                        className="flex-1 flex items-center justify-center p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition"
-                        title="Delete Office"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                      </button>
-                    </div>
-                  </>
-                )}
+          <div className="space-y-10">
+            {offices.filter(o => officeCategories[o] === 'SSG Clearance').length > 0 && (
+              <div>
+                <h4 className="flex items-center gap-2 font-black text-[10px] uppercase tracking-[0.2em] text-purple-600 dark:text-purple-400 mb-4 bg-purple-50 dark:bg-purple-900/20 w-fit px-3 py-1.5 rounded-lg border border-purple-100 dark:border-purple-800/50">
+                   SSG Clearance Offices
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {offices.filter(o => officeCategories[o] === 'SSG Clearance').sort((a,b) => a.localeCompare(b)).map(renderOfficeCard)}
+                </div>
               </div>
-            ))}
+            )}
+            
+            {offices.filter(o => officeCategories[o] === 'School Clearance' || !officeCategories[o]).length > 0 && (
+              <div>
+                <h4 className="flex items-center gap-2 font-black text-[10px] uppercase tracking-[0.2em] text-[#092B9C] dark:text-blue-400 mb-4 bg-blue-50 dark:bg-blue-900/20 w-fit px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/30">
+                   School Clearance Offices
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {offices.filter(o => officeCategories[o] === 'School Clearance' || !officeCategories[o]).sort((a,b) => a.localeCompare(b)).map(renderOfficeCard)}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Card>
@@ -421,9 +475,11 @@ const SignatoriesPage = () => {
                         <td className="p-4">
                           <div className="flex flex-col items-start gap-1">
                             <span className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 py-1 px-2 rounded-md text-xs font-bold">
-                              {getScopedOfficeName(sig.office, sig.dept_code)}
+                              {getScopedOfficeName(sig.office, sig.dept_code) || (sig.role === 'Dept. Dean' ? `${sig.dept_code} Dean's Office` : 'Unassigned')}
                             </span>
-                            <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">{officeCategories[sig.office] || 'School Clearance'}</span>
+                            <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">
+                              {officeCategories[sig.office] || (sig.role === 'Dept. Dean' || sig.office === 'Dean\'s Office' ? 'School Clearance' : 'Unassigned')}
+                            </span>
                           </div>
                         </td>
                         <td className="p-4 font-mono text-xs text-slate-500">{sig.secret_key || '—'}</td>
@@ -491,8 +547,12 @@ const SignatoriesPage = () => {
                 <label className="block text-xs font-black uppercase text-slate-500 mb-1.5">Role</label>
                 <select value={sigFormData.role} onChange={e => {
                   const newRole = e.target.value;
-                  const isDeptRole = ['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(newRole);
-                  setSigFormData({...sigFormData, role: newRole, dept_code: '', office: isDeptRole ? newRole : sigFormData.office});
+                  setSigFormData(prev => {
+                    let nextOffice = prev.office;
+                    if (newRole === 'Dept. Dean') nextOffice = "Dean's Office";
+                    else if (['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(newRole)) nextOffice = newRole;
+                    return { ...prev, role: newRole, dept_code: '', office: nextOffice };
+                  });
                 }} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#092B9C]">
                   <optgroup label="Department Scoped Roles" className="font-black text-[#092B9C] dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20">
                     <option value="Dept. Dean" className="font-bold text-slate-800 dark:text-white bg-white dark:bg-slate-900">Dept. Dean</option>
@@ -509,16 +569,50 @@ const SignatoriesPage = () => {
               {!['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sigFormData.role) && (
                 <select value={sigFormData.office} onChange={e => setSigFormData({...sigFormData, office: e.target.value})} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#092B9C]">
                 <option value="" disabled>Select Office</option>
-                {offices.map(o => {
-                  const assignedSig = signatories.find(s => s.office === o);
-                  const isDeptSpecific = ['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(o);
-                  const isTakenHere = !isDeptSpecific && assignedSig && assignedSig.id !== editingSigId;
-                  return (
-                    <option key={o} value={o} disabled={isTakenHere} className={isTakenHere ? "italic text-slate-400" : "font-bold"}>
-                      {o} {isTakenHere ? `(Assigned to ${assignedSig.name})` : ''}
-                    </option>
-                  );
-                })}
+                
+                {/* School Clearance Group */}
+                <optgroup label="School Clearance" className="font-black text-slate-800 dark:text-white bg-slate-100 dark:bg-slate-800">
+                  {offices.filter(o => officeCategories[o] === 'School Clearance' || !officeCategories[o]).map(o => {
+                    const assignedSigs = signatories.filter(s => s.office === o);
+                    const isDeptRole = ['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser', 'SSG Treasurer', 'SSG President', 'SSG Adviser'].includes(sigFormData.role);
+                    const isDepartmentalOffice = o.startsWith('Dept. ') || o.includes('Dean\'s Office') || o.startsWith('SSG ');
+                    const roleMismatch = (sigFormData.role === 'Admin' && isDepartmentalOffice) || (isDeptRole && !isDepartmentalOffice);
+                    const isTakenGlobally = !isDeptRole && assignedSigs.length > 0 && !assignedSigs.some(s => s.id === editingSigId);
+                    const isDisabled = roleMismatch || isTakenGlobally;
+                    
+                    let statusTitle = '';
+                    if (roleMismatch) statusTitle = sigFormData.role === 'Admin' ? '(Dept-Scoped Only)' : '(Global Office Only)';
+                    else if (isTakenGlobally) statusTitle = `(Assigned to ${assignedSigs[0].name})`;
+
+                    return (
+                      <option key={o} value={o} disabled={isDisabled} className={isDisabled ? "italic text-slate-400" : "font-bold bg-white dark:bg-slate-900"}>
+                        {o} {statusTitle}
+                      </option>
+                    );
+                  })}
+                </optgroup>
+
+                {/* SSG Clearance Group */}
+                <optgroup label="SSG Clearance" className="font-black text-slate-800 dark:text-white bg-slate-100 dark:bg-slate-800">
+                  {offices.filter(o => officeCategories[o] === 'SSG Clearance').map(o => {
+                    const assignedSigs = signatories.filter(s => s.office === o);
+                    const isDeptRole = ['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser', 'SSG Treasurer', 'SSG President', 'SSG Adviser'].includes(sigFormData.role);
+                    const isDepartmentalOffice = o.startsWith('Dept. ') || o.includes('Dean\'s Office') || o.startsWith('SSG ');
+                    const roleMismatch = (sigFormData.role === 'Admin' && isDepartmentalOffice) || (isDeptRole && !isDepartmentalOffice);
+                    const isTakenGlobally = !isDeptRole && assignedSigs.length > 0 && !assignedSigs.some(s => s.id === editingSigId);
+                    const isDisabled = roleMismatch || isTakenGlobally;
+                    
+                    let statusTitle = '';
+                    if (roleMismatch) statusTitle = sigFormData.role === 'Admin' ? '(Dept-Scoped Only)' : '(Global Office Only)';
+                    else if (isTakenGlobally) statusTitle = `(Assigned to ${assignedSigs[0].name})`;
+
+                    return (
+                      <option key={o} value={o} disabled={isDisabled} className={isDisabled ? "italic text-slate-400" : "font-bold bg-white dark:bg-slate-900"}>
+                        {o} {statusTitle}
+                      </option>
+                    );
+                  })}
+                </optgroup>
               </select>
               )}
 

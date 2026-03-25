@@ -13,12 +13,15 @@ const StudentDashboardPage = () => {
   const signedCount = offices.filter(o => clearances[o] === 'Cleared').length;
   const allCleared = signedCount === offices.length && offices.length > 0;
 
-  const schoolOffices = offices.filter(o => officeCategories[o] === 'School Clearance' || !officeCategories[o]);
-  const ssgOffices = offices.filter(o => officeCategories[o] === 'SSG Clearance');
+  const schoolOffices = offices.filter(o => officeCategories[o] === 'School Clearance' || !officeCategories[o]).sort((a,b) => a.localeCompare(b));
+  const ssgOffices = offices.filter(o => officeCategories[o] === 'SSG Clearance').sort((a,b) => a.localeCompare(b));
 
   const renderOfficeCard = (office) => {
     const cleared = clearances[office] === 'Cleared';
-    const officeReqs = requirements.filter(r => r.office === office);
+    const officeReqs = requirements.filter(r => 
+      r.office === office && 
+      (!r.dept_code || r.dept_code.trim().toLowerCase() === (student?.department || student?.dept || '').trim().toLowerCase())
+    );
     const displayOffice = getScopedOfficeName(office, student?.dept);
 
     return (

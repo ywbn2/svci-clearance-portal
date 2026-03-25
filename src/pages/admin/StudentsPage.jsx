@@ -217,7 +217,7 @@ const StudentsPage = () => {
           s.id || '—',
           s.name || `${s.firstname || ''} ${s.lastname || ''}`.trim() || '—',
           s.course || '—',
-          s.dept || '—',
+          s.department || '—',
           s.yearLevel || '—',
           s.account_status || 'Active',
           s.expiration_date || '—'
@@ -273,9 +273,9 @@ const StudentsPage = () => {
     const matchStatus = activeStatusFilters.length === 0 || activeStatusFilters.includes(s.status);
     const matchCourse = activeCourseFilters.length === 0 || activeCourseFilters.includes(s.course);
     const matchYear = activeYearFilters.length === 0 || activeYearFilters.includes(s.yearLevel);
-    const matchDept = activeDeptFilters.length === 0 || activeDeptFilters.includes(s.dept);
+    const matchDept = activeDeptFilters.length === 0 || activeDeptFilters.includes(s.department);
     return matchSearch && matchStatus && matchCourse && matchYear && matchDept;
-  });
+  }).sort((a, b) => (a.lastname || '').localeCompare(b.lastname || ''));
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     id: '', firstname: '', middlename: '', lastname: '', dob: '', gender: '', yearLevel: '', course: '', email: '', password: ''
@@ -323,7 +323,7 @@ const StudentsPage = () => {
       gender: formData.gender || null,
       yearLevel: formData.yearLevel || null,
       course: formData.course,
-      dept: assignedDept,
+      department: assignedDept,
       email: formData.email,
       password: formData.password
     };
@@ -527,9 +527,9 @@ const StudentsPage = () => {
                  <td className="p-4 text-slate-500 font-bold text-sm">{student.yearLevel || 'N/A'}</td>
                  <td className="p-4">
                    <span className="bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400 px-2 py-1 rounded text-sm font-black" title={(() => {
-                     const fdept = departments.find(d => d.code === student.dept);
-                     return fdept ? fdept.name : student.dept;
-                   })()}>{student.dept}</span>
+                     const fdept = departments.find(d => d.code === student.department);
+                     return fdept ? fdept.name : student.department;
+                   })()}>{student.department}</span>
                  </td>
                  <td className="p-4">
                    {(() => {

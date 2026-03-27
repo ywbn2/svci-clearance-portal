@@ -21,14 +21,29 @@ const SignatoryStudentsPage = () => {
     else setFn([...currentArr, val]);
   };
 
-  const isDeptSpecific = ['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(currentUser?.role) || ['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(currentUser?.office);
+  // Dept-scoped roles (Dean, Treasurer, Governor, Adviser) only see their own dept students
+  const isDeptSpecific = ['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(currentUser?.role);
   const userDept = (currentUser?.dept_code || '').trim().toLowerCase();
-  const visibleStudents = isDeptSpecific && currentUser?.dept_code 
-    ? students.filter(s => (s.department || '').trim().toLowerCase() === userDept) 
+  const visibleStudents = isDeptSpecific && userDept
+    ? students.filter(s => (s.department || '').trim().toLowerCase() === userDept)
     : students;
 
+  // The office key in office_clearances — Deans use "Dean's Office" as the raw key
+  // but the scoped display name might be "ACS Dean's Office". Try both.
+  const getCurrentClearanceStatus = (s) => {
+    const rawKey = currentUser?.office;
+    if (!rawKey) return 'Pending';
+    if (s.office_clearances?.[rawKey]) return s.office_clearances[rawKey];
+    // Fallback: try scoped key e.g. "ACS Dean's Office"
+    if (currentUser?.dept_code) {
+      const scopedKey = `${currentUser.dept_code} ${rawKey}`;
+      if (s.office_clearances?.[scopedKey]) return s.office_clearances[scopedKey];
+    }
+    return 'Pending';
+  };
+
   const filtered = visibleStudents.filter(s => {
-    const clearanceStatus = s.office_clearances?.[currentUser?.office] || 'Pending';
+    const clearanceStatus = getCurrentClearanceStatus(s);
     const matchSearch = (s.name?.toLowerCase() || '').includes(search.toLowerCase()) || (s.id?.toLowerCase() || '').includes(search.toLowerCase());
     const matchStatus = activeStatusFilters.length === 0 || activeStatusFilters.includes(clearanceStatus);
     const matchCourse = activeCourseFilters.length === 0 || activeCourseFilters.includes(s.course);

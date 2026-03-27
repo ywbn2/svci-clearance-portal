@@ -25,7 +25,7 @@ const SignatoryStudentsPage = () => {
   const isDeptSpecific = ['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(currentUser?.role);
   const userDeptCode = (currentUser?.dept_code || '').trim().toLowerCase();
   // Find the full name of the signatory's department to allow "Name to Code" legacy matching
-  const userDeptName = (departments.find(d => d.code.toLowerCase() === userDeptCode)?.name || '').trim().toLowerCase();
+  const userDeptName = (departments.find(d => (d.code || '').toLowerCase() === userDeptCode)?.name || '').trim().toLowerCase();
 
   const visibleStudents = isDeptSpecific && userDeptCode
     ? students.filter(s => {

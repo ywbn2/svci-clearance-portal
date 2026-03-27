@@ -450,7 +450,9 @@ const StudentsPage = () => {
 
     let successCount = 0;
     const nameToCode = {};
-    departments.forEach(d => { nameToCode[d.name.trim().toLowerCase()] = d.code; });
+    departments.forEach(d => { 
+      if (d.name) nameToCode[d.name.trim().toLowerCase()] = d.code; 
+    });
 
     for (const s of toRepair) {
       const code = nameToCode[(s.dept || "").trim().toLowerCase()];
@@ -473,7 +475,7 @@ const StudentsPage = () => {
       <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
         <h2 className="text-2xl font-black text-slate-800 dark:text-white">Student Masterlist</h2>
         <div className="flex items-center gap-2 flex-wrap">
-          {students.some(s => (!s.department || s.department === 'Unassigned') && s.dept) && (
+          {students.some(s => (!s.department || s.department === 'Unassigned') && (s.dept || '').trim() !== '') && (
             <button onClick={handleRepairDepartments} className="bg-amber-100 text-amber-700 px-4 py-2 rounded-lg font-bold hover:bg-amber-200 transition shadow-sm flex items-center gap-2 text-sm border border-amber-200">
               🛠 Repair Data
             </button>

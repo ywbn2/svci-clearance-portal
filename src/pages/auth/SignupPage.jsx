@@ -31,7 +31,7 @@ const SignupPage = () => {
 
   const getDepartmentForCourse = (selectedCourse) => {
     const dept = departments.find(d => d.assignedCourses && d.assignedCourses.includes(selectedCourse));
-    return dept ? dept.name : 'Unassigned';
+    return dept ? dept.code : 'Unassigned';
   };
 
   const handleSendVerification = async (e) => {
@@ -101,7 +101,7 @@ const SignupPage = () => {
       gender: formData.gender || null, 
       yearLevel: formData.yearLevel,
       course: formData.course, 
-      dept: assignedDept, 
+      department: assignedDept, 
       email: formData.email, 
       password: formData.password,
       signup_date: signupDate, 

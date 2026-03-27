@@ -437,12 +437,47 @@ const StudentsPage = () => {
     showToast(`Clearance updated for ${student.name}!`);
     logAction(currentUser, 'Edited Clearance', `Superadmin manually updated clearance map for ${student.name}`);
   };
+  const handleRepairDepartments = async () => {
+    const toRepair = students.filter(s => {
+      const dCode = (s.department || "").trim();
+      const dName = (s.dept || "").trim();
+      return (!dCode || dCode === 'Unassigned') && dName !== '';
+    });
+
+    if (toRepair.length === 0) return showToast("No students require department repair.", "success");
+
+    if (!await showConfirm(`This will repair ${toRepair.length} student records by mapping their department name to the official code. Proceed?`, "Bulk Data Repair", false)) return;
+
+    let successCount = 0;
+    const nameToCode = {};
+    departments.forEach(d => { nameToCode[d.name.trim().toLowerCase()] = d.code; });
+
+    for (const s of toRepair) {
+      const code = nameToCode[(s.dept || "").trim().toLowerCase()];
+      if (code) {
+        const { error } = await supabase.from('students').update({ department: code }).eq('id', s.id);
+        if (!error) successCount++;
+      } else if (Object.values(nameToCode).includes((s.dept || "").trim().toUpperCase())) {
+        const manualCode = (s.dept || "").trim().toUpperCase();
+        const { error } = await supabase.from('students').update({ department: manualCode }).eq('id', s.id);
+        if (!error) successCount++;
+      }
+    }
+
+    showToast(`Successfully repaired ${successCount} out of ${toRepair.length} student records.`, "success");
+    logAction(currentUser, 'Data Repair', `Repaired department codes for ${successCount} students.`);
+  };
 
   return (
     <Card className="h-full relative">
       <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
         <h2 className="text-2xl font-black text-slate-800 dark:text-white">Student Masterlist</h2>
         <div className="flex items-center gap-2 flex-wrap">
+          {students.some(s => (!s.department || s.department === 'Unassigned') && s.dept) && (
+            <button onClick={handleRepairDepartments} className="bg-amber-100 text-amber-700 px-4 py-2 rounded-lg font-bold hover:bg-amber-200 transition shadow-sm flex items-center gap-2 text-sm border border-amber-200">
+              🛠 Repair Data
+            </button>
+          )}
           <button onClick={exportToExcel} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-emerald-700 transition shadow-md flex items-center gap-2 text-sm">
             📊 Export Excel
           </button>

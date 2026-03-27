@@ -16,13 +16,23 @@ const StudentDashboardPage = () => {
   const schoolOffices = offices.filter(o => officeCategories[o] === 'School Clearance' || !officeCategories[o]).sort((a,b) => a.localeCompare(b));
   const ssgOffices = offices.filter(o => officeCategories[o] === 'SSG Clearance').sort((a,b) => a.localeCompare(b));
 
-  const renderOfficeCard = (office) => {
+    const renderOfficeCard = (office) => {
     const cleared = clearances[office] === 'Cleared';
-    const officeReqs = requirements.filter(r => 
-      r.office === office && 
-      (!r.dept_code || r.dept_code.trim().toLowerCase() === (student?.department || student?.dept || '').trim().toLowerCase())
-    );
-    const displayOffice = getScopedOfficeName(office, student?.dept);
+    
+    const officeReqs = requirements.filter(r => {
+      if (r.office !== office) return false;
+      if (!r.dept_code) return true; // Global requirements show for everyone
+      
+      const studentDeptCode = (student?.department || '').trim().toLowerCase();
+      const studentDeptName = (student?.dept || (students.find(s=>s.id===student?.id)?.dept) || '').trim().toLowerCase();
+      
+      const reqDeptCode = (r.dept_code || '').trim().toLowerCase();
+      // Find the full name for the requirement's dept_code to allow name-based matching
+      const reqDeptName = (departments.find(d => (d.code || '').toLowerCase() === reqDeptCode)?.name || '').trim().toLowerCase();
+      
+      return studentDeptCode === reqDeptCode || (studentDeptName !== '' && studentDeptName === reqDeptName);
+    });
+    const displayOffice = getScopedOfficeName(office, student?.department || student?.dept);
 
     return (
       <div key={office} className={`rounded-2xl border-2 p-5 transition-all duration-300 hover:shadow-lg overflow-hidden ${cleared ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-900/10 dark:border-emerald-700/60' : 'border-amber-200 bg-white dark:bg-slate-900 dark:border-slate-700 hover:border-amber-300'}`}>

@@ -21,31 +21,39 @@ const SignatoriesPage = () => {
   const [editingOfficeName, setEditingOfficeName] = useState('');
   const [isMigrating, setIsMigrating] = useState(false);
 
-  // ── Global auto-repair: fix any Dept. Dean whose office is not "Dean's Office" ──
+  // ── Global auto-repair: fix ALL dept-scoped signatories with wrong office values ──
+  // Dept. Dean → must have office = "Dean's Office"
+  // Dept. Treasurer/Governor/Adviser → must have office = their role name
   useEffect(() => {
-    const fixDeanAccounts = async () => {
-      const brokenDeans = signatories.filter(
-        s => s.role === 'Dept. Dean' && s.office !== "Dean's Office"
-      );
-      if (brokenDeans.length === 0) return;
+    const getCorrectOffice = (role) => {
+      if (role === 'Dept. Dean') return "Dean's Office";
+      if (['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(role)) return role;
+      return null; // not a dept-scoped role
+    };
+
+    const fixAllDeptAccounts = async () => {
+      const broken = signatories.filter(s => {
+        const expected = getCorrectOffice(s.role);
+        return expected !== null && s.office !== expected;
+      });
+      if (broken.length === 0) return;
 
       // Fix local state immediately
       setSignatories(prev =>
-        prev.map(s =>
-          s.role === 'Dept. Dean' && s.office !== "Dean's Office"
-            ? { ...s, office: "Dean's Office" }
-            : s
-        )
+        prev.map(s => {
+          const expected = getCorrectOffice(s.role);
+          return expected !== null && s.office !== expected ? { ...s, office: expected } : s;
+        })
       );
 
       // Fix in DB
       await Promise.all(
-        brokenDeans.map(s =>
-          supabase.from('signatories').update({ office: "Dean's Office" }).eq('id', s.id)
+        broken.map(s =>
+          supabase.from('signatories').update({ office: getCorrectOffice(s.role) }).eq('id', s.id)
         )
       );
     };
-    fixDeanAccounts();
+    fixAllDeptAccounts();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -209,12 +217,19 @@ const SignatoriesPage = () => {
     }
   };
 
+  // Helper: given a role, return the correct/expected office value
+  const getCorrectOfficeForRole = (role, fallbackOffice = '') => {
+    if (role === 'Dept. Dean') return "Dean's Office";
+    if (['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(role)) return role;
+    return fallbackOffice; // Admin or Staff: keep whatever was selected
+  };
+
   const handleOpenSigModal = (sig = null) => {
     setShowPassword(false);
     if (sig) {
       setEditingSigId(sig.id);
-      // Always enforce Dean's Office for Dept. Dean regardless of what's stored
-      const resolvedOffice = sig.role === 'Dept. Dean' ? "Dean's Office" : (sig.office || '');
+      // Always enforce the correct office for dept-scoped roles
+      const resolvedOffice = getCorrectOfficeForRole(sig.role, sig.office || '');
       setSigFormData({ email: sig.email, password: sig.password || '', office: resolvedOffice, secret_key: sig.secret_key || '', role: sig.role || 'Staff', dept_code: sig.dept_code || '' });
     } else {
       setEditingSigId(null);
@@ -224,8 +239,8 @@ const SignatoriesPage = () => {
   };
 
   const handleSaveSignatory = async () => {
-    // For Dept. Dean, always enforce the correct office
-    const resolvedOffice = sigFormData.role === 'Dept. Dean' ? "Dean's Office" : sigFormData.office;
+    // Enforce correct office for all dept-scoped roles before saving
+    const resolvedOffice = getCorrectOfficeForRole(sigFormData.role, sigFormData.office);
     const isDeptRole = ['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sigFormData.role);
     const isDeptSpecific = ['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sigFormData.role);
     const needsDept = isDeptRole;

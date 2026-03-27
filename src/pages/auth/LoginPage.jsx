@@ -49,8 +49,8 @@ const LoginPage = () => {
         {error && <div className="bg-rose-100 text-rose-700 p-3 rounded-lg text-sm font-bold mb-4">{error}</div>}
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">School ID</label>
-            <input type="text" value={email} onChange={e=>setEmail(e.target.value)} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none transition" placeholder="e.g. 2024-001" />
+            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">School ID / Email</label>
+            <input type="text" value={email} onChange={e=>setEmail(e.target.value)} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-[#092B9C] outline-none transition" placeholder="Student ID or email address" />
           </div>
           <div>
             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Password</label>

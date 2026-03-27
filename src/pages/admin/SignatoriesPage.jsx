@@ -463,7 +463,7 @@ const SignatoriesPage = () => {
                             <span className={`py-1 px-2 rounded-md text-xs font-bold ${sig.role === 'Dept. Dean' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>
                               {sig.role || 'Staff'}
                             </span>
-                            {sig.role === 'Dept. Dean' || ['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sig.office) ? (
+                            {['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sig.role) ? (
                               sig.dept_code ? (
                                 <span className="bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 px-2 py-0.5 rounded text-[10px] font-black">
                                   {sig.dept_code}
@@ -475,10 +475,10 @@ const SignatoriesPage = () => {
                         <td className="p-4">
                           <div className="flex flex-col items-start gap-1">
                             <span className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 py-1 px-2 rounded-md text-xs font-bold">
-                              {getScopedOfficeName(sig.office, sig.dept_code) || (sig.role === 'Dept. Dean' ? `${sig.dept_code} Dean's Office` : 'Unassigned')}
+                              {getScopedOfficeName(sig.office, sig.dept_code) || (['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sig.role) ? `${sig.dept_code || ''} Dean's Office` : 'Unassigned')}
                             </span>
                             <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">
-                              {officeCategories[sig.office] || (sig.role === 'Dept. Dean' || sig.office === 'Dean\'s Office' ? 'School Clearance' : 'Unassigned')}
+                              {officeCategories[sig.office] || (['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sig.role) || sig.office === "Dean's Office" ? 'School Clearance' : 'Unassigned')}
                             </span>
                           </div>
                         </td>

@@ -203,9 +203,9 @@ export const ProtectedAdminLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   if (!currentUser) return <Navigate to="/login" replace />;
   return (
-    <div className={`flex bg-slate-50/50 dark:bg-[#0a0f1c] min-h-screen text-slate-800 dark:text-slate-100 font-sans transition-colors duration-300 ${darkMode ? 'dark' : ''}`}>
+    <div className={`flex bg-slate-50/50 dark:bg-[#0a0f1c] h-screen text-slate-800 dark:text-slate-100 font-sans transition-colors duration-300 ${darkMode ? 'dark' : ''}`}>
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
         <Topbar onMenuToggle={() => setSidebarOpen(o => !o)} />
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
           {children}
@@ -219,9 +219,9 @@ export const StudentPortalLayout = () => {
   const { darkMode } = useContext(AppContext);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   return (
-    <div className={`flex bg-slate-50/50 dark:bg-[#0a0f1c] min-h-screen text-slate-800 dark:text-slate-100 font-sans transition-colors duration-300 ${darkMode ? 'dark' : ''}`}>
+    <div className={`flex bg-slate-50/50 dark:bg-[#0a0f1c] h-screen text-slate-800 dark:text-slate-100 font-sans transition-colors duration-300 ${darkMode ? 'dark' : ''}`}>
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
         <Topbar onMenuToggle={() => setSidebarOpen(o => !o)} />
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
           <Outlet />

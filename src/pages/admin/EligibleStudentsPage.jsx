@@ -10,6 +10,7 @@ const EligibleStudentsPage = () => {
   const { eligibleStudents, setEligibleStudents, students, showToast, showConfirm, logAction, currentUser } = useContext(AppContext);
   
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'registered' | 'not-registered'
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
@@ -22,28 +23,32 @@ const EligibleStudentsPage = () => {
 
   // Safe memoization with extensive null/undefined checks
   const filtered = useMemo(() => {
-    // If eligibleStudents is somehow undefined or not an array, default to empty array
     const list = Array.isArray(eligibleStudents) ? eligibleStudents : [];
-    
+    const registeredIds = new Set(Array.isArray(students) ? students.map(s => s.id) : []);
+
     // Always sort by family name A-Z
     const sorted = [...list].sort((a, b) => (a.lastname || '').localeCompare(b.lastname || ''));
 
-    if (!searchTerm) {
-      return sorted;
-    }
-    
     const search = searchTerm.toLowerCase().trim();
-    
-    // Perform safe filter on already sorted list
+
     return sorted.filter(s => {
       if (!s || typeof s !== 'object') return false;
-      const idStr = String(s.school_id || '').toLowerCase();
-      const firstStr = String(s.firstname || '').toLowerCase();
-      const lastStr = String(s.lastname || '').toLowerCase();
-      
-      return idStr.includes(search) || firstStr.includes(search) || lastStr.includes(search);
+
+      // Status filter
+      if (statusFilter === 'registered' && !registeredIds.has(s.school_id)) return false;
+      if (statusFilter === 'not-registered' && registeredIds.has(s.school_id)) return false;
+
+      // Search filter
+      if (search) {
+        const idStr = String(s.school_id || '').toLowerCase();
+        const firstStr = String(s.firstname || '').toLowerCase();
+        const lastStr = String(s.lastname || '').toLowerCase();
+        if (!idStr.includes(search) && !firstStr.includes(search) && !lastStr.includes(search)) return false;
+      }
+
+      return true;
     });
-  }, [eligibleStudents, searchTerm]);
+  }, [eligibleStudents, students, searchTerm, statusFilter]);
 
   const totalFiltered = filtered.length;
   const totalPages = Math.max(1, Math.ceil(totalFiltered / itemsPerPage));
@@ -51,7 +56,13 @@ const EligibleStudentsPage = () => {
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
-    setCurrentPage(1); // Reset to page 1 on new search
+    setCurrentPage(1);
+    setSelectedIds(new Set());
+  };
+
+  const handleStatusFilter = (val) => {
+    setStatusFilter(val);
+    setCurrentPage(1);
     setSelectedIds(new Set());
   };
 
@@ -368,15 +379,41 @@ const EligibleStudentsPage = () => {
 
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-          <div className="relative w-full sm:w-64">
-            <SearchIcon className="w-5 h-5 absolute left-3 top-2.5 text-gray-400" />
-            <input 
-              type="text" 
-              placeholder="Search ID or Name..." 
-              value={searchTerm}
-              onChange={handleSearchChange}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border dark:bg-gray-700 dark:bg-slate-800 dark:border-gray-600 focus:outline-none focus:border-indigo-500"
-            />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
+            <div className="relative w-full sm:w-64">
+              <SearchIcon className="w-5 h-5 absolute left-3 top-2.5 text-gray-400" />
+              <input 
+                type="text" 
+                placeholder="Search ID or Name..." 
+                value={searchTerm}
+                onChange={handleSearchChange}
+                className="w-full pl-10 pr-4 py-2 rounded-lg border dark:bg-gray-700 dark:bg-slate-800 dark:border-gray-600 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            {/* Status filter tabs */}
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+              {[
+                { key: 'all', label: 'All' },
+                { key: 'registered', label: '✓ Registered' },
+                { key: 'not-registered', label: 'Not Registered' },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => handleStatusFilter(key)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                    statusFilter === key
+                      ? key === 'registered'
+                        ? 'bg-emerald-500 text-white shadow-sm'
+                        : key === 'not-registered'
+                        ? 'bg-slate-500 text-white shadow-sm'
+                        : 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">
             Showing Page {currentPage} of {totalPages}

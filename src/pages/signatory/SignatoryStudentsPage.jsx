@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useContext, createContext, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useContext, createContext, useMemo, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation, Link, NavLink, Outlet } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { DashboardIcon, StudentsIcon, PenIcon, ShieldIcon, BookIcon, BuildingIcon, FileCheckIcon, FileTextIcon, SunIcon, MoonIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon, CalendarIcon, UserIcon, KeyIcon, LogOutIcon, EyeIcon, EyeOffIcon, PlusIcon, SaveIcon, Trash2Icon, FileSignatureIcon, UploadIcon, DownloadIcon, ChevronRightIcon, SearchIcon, MenuIcon, XIcon, SettingsIcon } from '../../icons';
@@ -25,11 +25,7 @@ const SignatoryStudentsPage = () => {
   const isDeptSpecific = ['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(currentUser?.role);
   const userDept = (currentUser?.dept_code || '').trim().toLowerCase();
   const visibleStudents = isDeptSpecific && userDept
-    ? students.filter(s => {
-        const sDept = (s.department || '').trim().toLowerCase();
-        // Match dept code OR show students with no department assigned (catch-all)
-        return sDept === userDept || sDept === '' || sDept === 'unassigned';
-      })
+    ? students.filter(s => (s.department || '').trim().toLowerCase() === userDept)
     : students;
 
   // The office key in office_clearances — Deans use "Dean's Office" as the raw key

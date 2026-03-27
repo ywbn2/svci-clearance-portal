@@ -23,9 +23,17 @@ const SignatoryStudentsPage = () => {
 
   // Dept-scoped roles (Dean, Treasurer, Governor, Adviser) only see their own dept students
   const isDeptSpecific = ['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(currentUser?.role);
-  const userDept = (currentUser?.dept_code || '').trim().toLowerCase();
-  const visibleStudents = isDeptSpecific && userDept
-    ? students.filter(s => (s.department || '').trim().toLowerCase() === userDept)
+  const userDeptCode = (currentUser?.dept_code || '').trim().toLowerCase();
+  // Find the full name of the signatory's department to allow "Name to Code" legacy matching
+  const userDeptName = (departments.find(d => d.code.toLowerCase() === userDeptCode)?.name || '').trim().toLowerCase();
+
+  const visibleStudents = isDeptSpecific && userDeptCode
+    ? students.filter(s => {
+        const sDeptCode = (s.department || '').trim().toLowerCase();
+        const sDeptName = (s.dept || '').trim().toLowerCase();
+        // Match by code OR match by legacy full name field
+        return sDeptCode === userDeptCode || (sDeptName !== '' && sDeptName === userDeptName);
+      })
     : students;
 
   // The office key in office_clearances — Deans use "Dean's Office" as the raw key

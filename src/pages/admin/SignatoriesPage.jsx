@@ -638,15 +638,16 @@ const SignatoriesPage = () => {
                 </select>
               </div>
 
-              {/* If Dept. Dean: office is auto-locked to Dean's Office */}
-              {sigFormData.role === 'Dept. Dean' ? (
+              {/* Dept-scoped roles: office is auto-assigned, show read-only badge for all 4 */}
+              {['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sigFormData.role) ? (
                 <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-3 flex items-center gap-3">
                   <span className="text-xs font-black text-slate-400 uppercase tracking-wider">Office</span>
-                  <span className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 px-3 py-1 rounded-lg text-sm font-bold">
-                    Dean's Office <span className="text-[10px] text-slate-400 font-normal">(auto-assigned)</span>
+                  <span className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 px-3 py-1 rounded-lg text-sm font-bold flex items-center gap-1.5">
+                    🔒 {getCorrectOfficeForRole(sigFormData.role, sigFormData.office)}
+                    <span className="text-[10px] text-slate-400 font-normal">(auto-assigned)</span>
                   </span>
                 </div>
-              ) : !['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sigFormData.role) && (
+              ) : (
                 <select value={sigFormData.office} onChange={e => setSigFormData({...sigFormData, office: e.target.value})} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#092B9C]">
                 <option value="" disabled>Select Office</option>
                 

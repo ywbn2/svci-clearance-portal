@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, createContext, useMemo, useRef } from 'react';
+﻿import React, { useState, useEffect, useContext, createContext, useMemo, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation, Link, NavLink, Outlet } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { DashboardIcon, StudentsIcon, PenIcon, ShieldIcon, BookIcon, BuildingIcon, FileCheckIcon, FileTextIcon, SunIcon, MoonIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon, CalendarIcon, UserIcon, KeyIcon, LogOutIcon, EyeIcon, EyeOffIcon, PlusIcon, SaveIcon, Trash2Icon, FileSignatureIcon, UploadIcon, DownloadIcon, ChevronRightIcon, SearchIcon, MenuIcon, XIcon, SettingsIcon } from '../../icons';
@@ -25,7 +25,11 @@ const SignatoryStudentsPage = () => {
   const isDeptSpecific = ['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(currentUser?.role);
   const userDept = (currentUser?.dept_code || '').trim().toLowerCase();
   const visibleStudents = isDeptSpecific && userDept
-    ? students.filter(s => (s.department || '').trim().toLowerCase() === userDept)
+    ? students.filter(s => {
+        const sDept = (s.department || '').trim().toLowerCase();
+        // Match dept code OR show students with no department assigned (catch-all)
+        return sDept === userDept || sDept === '' || sDept === 'unassigned';
+      })
     : students;
 
   // The office key in office_clearances — Deans use "Dean's Office" as the raw key
@@ -409,14 +413,10 @@ const SignatoryStudentsPage = () => {
                     </td>
                     <td className="p-4 text-slate-500 text-xs font-bold">{s.yearLevel || 'N/A'}</td>
                     <td className="p-4">{(() => {
-                      const officeStatus = s.office_clearances?.[currentUser?.office];
-                      const isSigned = officeStatus === 'Cleared';
-                      return <span className={`px-2 py-1 rounded text-xs font-black uppercase ${isSigned ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>{isSigned ? '✓ Signed' : 'Not Signed'}</span>;
+                      const isSigned = getCurrentClearanceStatus(s) === 'Cleared';\n                       return <span className={`px-2 py-1 rounded text-xs font-black uppercase ${isSigned ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>{isSigned ? '✓ Signed' : 'Not Signed'}</span>;
                     })()}</td>
                     <td className="p-4 text-center">{(() => {
-                      const officeStatus = s.office_clearances?.[currentUser?.office];
-                      const isSigned = officeStatus === 'Cleared';
-                      if (!signingEnabled) {
+                      const isSigned = getCurrentClearanceStatus(s) === 'Cleared';\n                       if (!signingEnabled) {
                         return <button disabled className="bg-slate-100 dark:bg-slate-800/80 text-slate-400 dark:text-slate-600 px-4 py-2 rounded-lg font-bold cursor-not-allowed shadow-inner transition whitespace-nowrap"><XCircleIcon className="w-4 h-4 inline-block mr-1 -mt-0.5" />Disabled By Admin</button>;
                       }
                       return isSigned
@@ -425,7 +425,7 @@ const SignatoryStudentsPage = () => {
                     })()}</td>
                   </tr>
                 ))}
-                {filtered.length === 0 && <tr><td colSpan="7" className="p-4 text-center text-slate-500">No matching students found.</td></tr>}
+                {filtered.length === 0 && (<tr><td colSpan="7" className="p-8 text-center"><div className="flex flex-col items-center gap-2 text-slate-500"><span className="text-4xl">🎓</span><p className="font-bold text-slate-700 dark:text-slate-200">No students found</p>{isDeptSpecific && userDept ? <p className="text-sm">No registered students matched department <span className="font-black text-indigo-600 dark:text-indigo-400">{currentUser?.dept_code}</span>. Make sure students are registered and assigned to the correct department.</p> : <p className="text-sm">No students match your current filters.</p>}</div></td></tr>)}
               </tbody>
            </table>
          </div>
@@ -468,3 +468,6 @@ const SignatoryStudentsPage = () => {
 };
 
 export default SignatoryStudentsPage;
+
+
+

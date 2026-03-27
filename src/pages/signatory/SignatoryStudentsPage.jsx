@@ -339,7 +339,7 @@ const SignatoryStudentsPage = () => {
               <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Academic Course</span>
               <div className="grid grid-cols-3 gap-1">
                 {(isDeptSpecific && currentUser?.dept_code 
-                    ? courses.filter(c => departments.find(d => (d.code || '').trim().toLowerCase() === userDept)?.assignedCourses?.includes(c.code)) 
+                    ? courses.filter(c => departments.find(d => (d.code || '').trim().toLowerCase() === userDeptCode)?.assignedCourses?.includes(c.code)) 
                     : courses).map(c => (
                   <button key={c.id} onClick={() => toggleFilter(setActiveCourseFilters, activeCourseFilters, c.code)}
                     className={`px-1.5 py-1 rounded-md text-[11px] font-black transition-all border-2 truncate ${activeCourseFilters.includes(c.code) ? 'bg-[#092B9C] text-white border-blue-800' : 'bg-white text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700 hover:border-slate-300'}`} title={c.name}>
@@ -431,7 +431,7 @@ const SignatoryStudentsPage = () => {
                     })()}</td>
                   </tr>
                 ))}
-                {filtered.length === 0 && (<tr><td colSpan="7" className="p-8 text-center"><div className="flex flex-col items-center gap-2 text-slate-500"><span className="text-4xl">🎓</span><p className="font-bold text-slate-700 dark:text-slate-200">No students found</p>{isDeptSpecific && userDept ? <p className="text-sm">No registered students matched department <span className="font-black text-indigo-600 dark:text-indigo-400">{currentUser?.dept_code}</span>. Make sure students are registered and assigned to the correct department.</p> : <p className="text-sm">No students match your current filters.</p>}</div></td></tr>)}
+                {filtered.length === 0 && (<tr><td colSpan="7" className="p-8 text-center"><div className="flex flex-col items-center gap-2 text-slate-500"><span className="text-4xl">🎓</span><p className="font-bold text-slate-700 dark:text-slate-200">No students found</p>{isDeptSpecific && userDeptCode ? <p className="text-sm">No registered students matched department <span className="font-black text-indigo-600 dark:text-indigo-400">{currentUser?.dept_code}</span>. Make sure students are registered and assigned to the correct department.</p> : <p className="text-sm">No students match your current filters.</p>}</div></td></tr>)}
               </tbody>
            </table>
          </div>

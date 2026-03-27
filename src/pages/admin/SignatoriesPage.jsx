@@ -21,6 +21,34 @@ const SignatoriesPage = () => {
   const [editingOfficeName, setEditingOfficeName] = useState('');
   const [isMigrating, setIsMigrating] = useState(false);
 
+  // ── Global auto-repair: fix any Dept. Dean whose office is not "Dean's Office" ──
+  useEffect(() => {
+    const fixDeanAccounts = async () => {
+      const brokenDeans = signatories.filter(
+        s => s.role === 'Dept. Dean' && s.office !== "Dean's Office"
+      );
+      if (brokenDeans.length === 0) return;
+
+      // Fix local state immediately
+      setSignatories(prev =>
+        prev.map(s =>
+          s.role === 'Dept. Dean' && s.office !== "Dean's Office"
+            ? { ...s, office: "Dean's Office" }
+            : s
+        )
+      );
+
+      // Fix in DB
+      await Promise.all(
+        brokenDeans.map(s =>
+          supabase.from('signatories').update({ office: "Dean's Office" }).eq('id', s.id)
+        )
+      );
+    };
+    fixDeanAccounts();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleAddOffice = async () => {
     const trimmed = newOffice.trim();
     if (trimmed) {
@@ -185,33 +213,62 @@ const SignatoriesPage = () => {
     setShowPassword(false);
     if (sig) {
       setEditingSigId(sig.id);
-      setSigFormData({ email: sig.email, password: sig.password || '', office: sig.office, secret_key: sig.secret_key || '', role: sig.role || 'Staff', dept_code: sig.dept_code || '' });
+      // Always enforce Dean's Office for Dept. Dean regardless of what's stored
+      const resolvedOffice = sig.role === 'Dept. Dean' ? "Dean's Office" : (sig.office || '');
+      setSigFormData({ email: sig.email, password: sig.password || '', office: resolvedOffice, secret_key: sig.secret_key || '', role: sig.role || 'Staff', dept_code: sig.dept_code || '' });
     } else {
       setEditingSigId(null);
-      setSigFormData({ email: '', password: '', office: '', secret_key: '', role: 'Dept. Dean', dept_code: '' });
+      setSigFormData({ email: '', password: '', office: "Dean's Office", secret_key: '', role: 'Dept. Dean', dept_code: '' });
     }
     setShowSigModal(true);
   };
 
   const handleSaveSignatory = async () => {
-    if (sigFormData.email && sigFormData.password && sigFormData.office && sigFormData.secret_key) {
-      const isDeptSpecific = ['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sigFormData.office);
-      const needsDept = sigFormData.role === 'Dept. Dean' || isDeptSpecific;
+    // For Dept. Dean, always enforce the correct office
+    const resolvedOffice = sigFormData.role === 'Dept. Dean' ? "Dean's Office" : sigFormData.office;
+    const isDeptRole = ['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sigFormData.role);
+    const isDeptSpecific = ['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sigFormData.role);
+    const needsDept = isDeptRole;
 
+    if (sigFormData.email && sigFormData.password && resolvedOffice && sigFormData.secret_key) {
       if (needsDept && !sigFormData.dept_code) {
-        return showToast(sigFormData.role === 'Dept. Dean' ? 'A Dept. Dean must be assigned to a Department.' : `The ${sigFormData.office} must be assigned to a specific Department.`, 'error');
+        return showToast(
+          sigFormData.role === 'Dept. Dean'
+            ? 'A Dept. Dean must be assigned to a Department.'
+            : `The ${sigFormData.role} must be assigned to a specific Department.`,
+          'error'
+        );
       }
 
       const isEmailTaken = signatories.some(s => s.email.toLowerCase() === sigFormData.email.toLowerCase() && s.id !== editingSigId);
       if (isEmailTaken) return showToast(`The email '${sigFormData.email}' is already registered!`, 'error');
-      
-      // We no longer strictly block duplicating the "office" if it's a department-specific office, BUT we must block if the SAME office + dept_code exists!
-      const isOfficeTaken = signatories.some(s => s.office === sigFormData.office && (!isDeptSpecific || s.dept_code === sigFormData.dept_code) && s.id !== editingSigId);
+
+      // For Dept. Dean: multiple Deans allowed ONLY if they belong to different departments
+      // For other dept roles: same role + same dept_code is a duplicate
+      // For global roles: same office is a duplicate
+      const isOfficeTaken = signatories.some(s => {
+        if (s.id === editingSigId) return false;
+        if (sigFormData.role === 'Dept. Dean') {
+          // A dept can only have ONE Dean
+          return s.role === 'Dept. Dean' && s.dept_code === sigFormData.dept_code;
+        }
+        if (isDeptSpecific) {
+          return s.office === resolvedOffice && s.dept_code === sigFormData.dept_code;
+        }
+        return s.office === resolvedOffice;
+      });
       if (isOfficeTaken) {
-        return showToast(isDeptSpecific ? `There is already a ${sigFormData.office} assigned to ${sigFormData.dept_code}!` : `The '${sigFormData.office}' office already has an assigned signatory!`, 'error');
+        return showToast(
+          sigFormData.role === 'Dept. Dean'
+            ? `The ${sigFormData.dept_code} department already has a Dean assigned!`
+            : isDeptSpecific
+            ? `There is already a ${sigFormData.role} assigned to ${sigFormData.dept_code}!`
+            : `The '${resolvedOffice}' office already has an assigned signatory!`,
+          'error'
+        );
       }
 
-      const dataToSave = { ...sigFormData, dept_code: needsDept ? sigFormData.dept_code : null };
+      const dataToSave = { ...sigFormData, office: resolvedOffice, dept_code: needsDept ? sigFormData.dept_code : null };
       setShowSigModal(false);
 
       if (editingSigId) {

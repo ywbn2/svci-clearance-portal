@@ -313,13 +313,13 @@ const SignatoriesPage = () => {
   };
   const handleDeleteSignatory = async (id) => {
     if (await showConfirm("Are you sure you want to remove this account? All requirements they posted and clearances they processed will be completely revoked.")) {
+      // Declare rollbacks before try so they're accessible in catch
+      let rollbackSigs = [...signatories];
+      let rollbackReqs = [...requirements];
+      let rollbackStudents = [...students];
       try {
         const sig = signatories.find(s => s.id === id);
         if (!sig) return;
-
-        const rollbackSigs = [...signatories];
-        const rollbackReqs = [...requirements];
-        const rollbackStudents = [...students];
 
         setSignatories(signatories.filter(s => s.id !== id));
         setRequirements(requirements.filter(r => r.office !== sig.office && r.author !== sig.email));

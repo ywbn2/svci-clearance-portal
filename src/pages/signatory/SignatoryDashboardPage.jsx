@@ -6,13 +6,18 @@ import { Card } from '../../components/Navigation';
 import { getScopedOfficeName } from '../../utils/helpers';
 
 const SignatoryDashboardPage = () => {
-  const { currentUser, students, signingEnabled } = useContext(AppContext);
+  const { currentUser, students, signingEnabled, departments } = useContext(AppContext);
   const isDeptSpecific = ['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(currentUser?.role) || ['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(currentUser?.office);
   const userDept = (currentUser?.dept_code || '').trim().toLowerCase();
+  // Dual-match: include legacy students that store full dept name instead of code
+  const userDeptName = (departments.find(d => (d.code || '').toLowerCase() === userDept)?.name || '').trim().toLowerCase();
   const visibleStudents = isDeptSpecific && currentUser?.dept_code 
-    ? students.filter(s => (s.department || '').trim().toLowerCase() === userDept) 
+    ? students.filter(s => {
+        const sCode = (s.department || '').trim().toLowerCase();
+        const sName = (s.dept || '').trim().toLowerCase();
+        return sCode === userDept || (sName !== '' && sName === userDeptName);
+      })
     : students;
-    
   const pendingRequests = visibleStudents.filter(s => (s.office_clearances?.[currentUser?.office] || 'Pending') === 'Pending').length;
   const clearedRequests = visibleStudents.filter(s => s.office_clearances?.[currentUser?.office] === 'Cleared').length;
 

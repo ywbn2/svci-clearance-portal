@@ -10,8 +10,10 @@ const StudentProfilePage = () => {
   const { currentUser, setCurrentUser, students, departments, showToast } = useContext(AppContext);
   const student = students.find(s => s.id === currentUser?.id) || currentUser;
 
-  // Find department by matching student's course
-  const studentDept = departments.find(d => d.assignedCourses?.includes(student?.course));
+  // Find department: try by course assignment, then by department code, then by legacy dept name
+  const studentDept = departments.find(d => d.assignedCourses?.includes(student?.course))
+    || departments.find(d => (d.code || '').toLowerCase() === (student?.department || '').toLowerCase())
+    || departments.find(d => (d.name || '').toLowerCase() === (student?.dept || '').toLowerCase());
 
   const [pwForm, setPwForm] = useState({ current: '', newPw: '', confirm: '' });
   const [showPwSection, setShowPwSection] = useState(false);

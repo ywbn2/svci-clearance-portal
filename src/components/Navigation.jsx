@@ -55,6 +55,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    localStorage.removeItem('portal_session');
     navigate('/login');
   };
 

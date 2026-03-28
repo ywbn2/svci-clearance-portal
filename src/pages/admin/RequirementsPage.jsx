@@ -69,6 +69,11 @@ const RequirementsPage = () => {
   };
 
   const handleDelete = async (id) => {
+    const req = requirements.find(r => r.id === id);
+    // Non-admins can only delete their own requirements
+    if (!isAdmin && req?.author !== currentUser?.email) {
+      return showToast("You can only delete requirements you posted.", "error");
+    }
     if (await showConfirm("Are you sure you want to completely destroy this requirement globally?")) {
       const { error } = await supabase.from('requirements').delete().eq('id', id);
       if (error) return showToast("Failed: " + error.message, "error");
@@ -90,10 +95,11 @@ const RequirementsPage = () => {
           <p className="text-slate-500 dark:text-slate-400 font-bold mt-1">Design clearance tasks that automatically block student records from clearing.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
-          {isAdmin && (
+              {/* Admin sees all distinct offices from requirements, not just the global list */}
+            {isAdmin && (
             <select value={selectedOfficeFilter} onChange={(e) => setSelectedOfficeFilter(e.target.value)} className="p-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl font-bold text-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#092B9C] shadow-sm cursor-pointer">
               <option value="All">All Offices</option>
-              {offices.map(o => <option key={o} value={o}>{o}</option>)}
+              {[...new Set(requirements.map(r => r.office).filter(Boolean))].sort().map(o => <option key={o} value={o}>{o}</option>)}
             </select>
           )}
           <button onClick={() => handleOpenModal()} className="bg-[#092B9C] text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-800 transition shadow-lg whitespace-nowrap">+ Add Requirement</button>

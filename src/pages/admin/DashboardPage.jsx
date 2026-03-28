@@ -23,7 +23,15 @@ const DashboardPage = () => {
           { title: "System Signatories", val: signatories.length, color: "border-purple-500 text-purple-600 dark:text-purple-400" },
           { title: "Active Accounts", val: students.filter(s => getAccountStatus(s) === 'Active').length, color: "border-emerald-500 text-emerald-600 dark:text-emerald-400" },
           { title: "Deactivated / Expired", val: students.filter(s => getAccountStatus(s) !== 'Active').length, color: "border-rose-500 text-rose-600 dark:text-rose-400" },
-          { title: "100% Cleared", val: students.filter(s => offices.length > 0 && offices.filter(o => s.office_clearances?.[o] === 'Cleared').length === offices.length).length, color: "border-teal-500 text-teal-600 dark:text-teal-400" }
+          { title: "100% Cleared", val: students.filter(s => {
+              // Build the effective office list for this student (global + dept-scoped)
+              const sCode = (s.department || '').trim().toLowerCase();
+              const deptScopedForStudent = signatories
+                .filter(sig => ['Dept. Dean','Dept. Treasurer','Dept. Governor','Dept. Adviser'].includes(sig.role) && (sig.dept_code||'').trim().toLowerCase() === sCode)
+                .map(sig => sig.office).filter(Boolean);
+              const allOffices = [...new Set([...offices, ...deptScopedForStudent])];
+              return allOffices.length > 0 && allOffices.every(o => s.office_clearances?.[o] === 'Cleared');
+            }).length, color: "border-teal-500 text-teal-600 dark:text-teal-400" }
         ].map((s, i) => (
           <Card key={i} className={`border-l-4 ${s.color.split(' ')[0]}`}>
             <p className="text-[10px] text-slate-500 dark:text-slate-400 font-black uppercase tracking-widest leading-tight">{s.title}</p>
@@ -90,10 +98,13 @@ const DashboardPage = () => {
                 if (await showConfirm("WARNING: This will reset ALL students' clearances to PENDING and permanently delete ALL posted requirements for a new semester. Student accounts will NOT be deleted. Are you sure you want to start a new clearance period?", "Reset Semester", true)) {
                   let hasStudentError = false;
                   const allIds = students.map(s => s.id);
+                  // Build a fresh clearance map with all global offices set to 'Pending'
+                  const freshClearances = {};
+                  offices.forEach(o => { freshClearances[o] = 'Pending'; });
                   if (allIds.length > 0) {
                     for (let i = 0; i < allIds.length; i += 100) {
                       const { error } = await supabase.from('students')
-                        .update({ office_clearances: {}, status: 'PENDING' })
+                        .update({ office_clearances: freshClearances, status: 'PENDING' })
                         .in('id', allIds.slice(i, i + 100));
                       if (error) hasStudentError = true;
                     }

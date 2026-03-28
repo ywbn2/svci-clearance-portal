@@ -14,9 +14,16 @@ const RequirementsPage = () => {
   const [formData, setFormData] = useState({ title: '', description: '', mandatory: true, office: '' });
   const [selectedOfficeFilter, setSelectedOfficeFilter] = useState('All');
 
-  const officeReqs = requirements.filter(r => 
-    isAdmin ? (selectedOfficeFilter === 'All' ? true : r.office === selectedOfficeFilter) : r.office === currentUser?.office
-  );
+  const isDeptScoped = !isAdmin && ['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(currentUser?.role);
+
+  const officeReqs = requirements.filter(r => {
+    if (isAdmin) return selectedOfficeFilter === 'All' ? true : r.office === selectedOfficeFilter;
+    // Signatory: must match their office
+    if (r.office !== currentUser?.office) return false;
+    // Dept-scoped: only show requirements with no dept_code OR matching their dept
+    if (isDeptScoped) return !r.dept_code || r.dept_code === currentUser?.dept_code;
+    return true;
+  });
 
   const handleOpenModal = (req = null) => {
     if (req) {

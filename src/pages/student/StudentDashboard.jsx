@@ -6,15 +6,48 @@ import { Card } from '../../components/Navigation';
 import { getScopedOfficeName } from '../../utils/helpers';
 
 const StudentDashboardPage = () => {
-  const { currentUser, offices, officeCategories, requirements, students, departments } = useContext(AppContext);
+  const { currentUser, offices, officeCategories, requirements, students, departments, signatories } = useContext(AppContext);
   const student = students.find(s => s.id === currentUser?.id) || currentUser;
   const clearances = student?.office_clearances || {};
 
-  const signedCount = offices.filter(o => clearances[o] === 'Cleared').length;
-  const allCleared = signedCount === offices.length && offices.length > 0;
+  // Determine the student's dept identifiers for matching
+  const studentDeptCode = (student?.department || '').trim().toLowerCase();
+  const studentDeptNameRaw = (student?.dept || '').trim().toLowerCase();
 
-  const schoolOffices = offices.filter(o => officeCategories[o] === 'School Clearance' || !officeCategories[o]).sort((a,b) => a.localeCompare(b));
-  const ssgOffices = offices.filter(o => officeCategories[o] === 'SSG Clearance').sort((a,b) => a.localeCompare(b));
+  // Helper: does a given dept_code belong to this student's department?
+  const isStudentDept = (deptCode) => {
+    if (!deptCode) return false;
+    const code = (deptCode || '').trim().toLowerCase();
+    if (studentDeptCode && studentDeptCode === code) return true;
+    // legacy: match by full name
+    const deptFullName = (departments.find(d => (d.code || '').toLowerCase() === code)?.name || '').trim().toLowerCase();
+    return studentDeptNameRaw !== '' && studentDeptNameRaw === deptFullName;
+  };
+
+  // Find dept-scoped signatories (Treasurer, Governor, Adviser, Dean) in this student's dept
+  // These offices may NOT be in the global `offices` list — we inject them dynamically
+  const DEPT_SCOPED_ROLES = ['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'];
+  const deptScopedOffices = [
+    ...new Set(
+      (signatories || [])
+        .filter(s => DEPT_SCOPED_ROLES.includes(s.role) && isStudentDept(s.dept_code))
+        .map(s => s.office)
+        .filter(Boolean)
+    )
+  ].filter(o => !offices.includes(o)); // avoid duplicates with the global list
+
+  // Effective office list = global offices + dept-scoped offices for this student
+  const effectiveOffices = [...offices, ...deptScopedOffices];
+
+  const signedCount = effectiveOffices.filter(o => clearances[o] === 'Cleared').length;
+  const allCleared = signedCount === effectiveOffices.length && effectiveOffices.length > 0;
+
+  // Dept-scoped offices are always School Clearance category
+  const getCategory = (o) => officeCategories[o] || (deptScopedOffices.includes(o) ? 'School Clearance' : 'School Clearance');
+
+  const schoolOffices = effectiveOffices.filter(o => getCategory(o) !== 'SSG Clearance').sort((a,b) => a.localeCompare(b));
+  const ssgOffices = effectiveOffices.filter(o => getCategory(o) === 'SSG Clearance').sort((a,b) => a.localeCompare(b));
+
 
     const renderOfficeCard = (office) => {
     const cleared = clearances[office] === 'Cleared';
@@ -80,7 +113,7 @@ const StudentDashboardPage = () => {
           <p className={`font-black text-xl ${allCleared ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
             {allCleared
               ? '✅ Clearance Completed'
-              : `Clearance Progress: ${offices.length > 0 ? Math.round((signedCount / offices.length) * 100) : 0}% Complete`
+              : `Clearance Progress: ${effectiveOffices.length > 0 ? Math.round((signedCount / effectiveOffices.length) * 100) : 0}% Complete`
             }
           </p>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{allCleared ? 'All offices have approved your clearance — you are fully cleared!' : 'Some offices are still pending. Complete all requirements to proceed.'}</p>
@@ -108,7 +141,7 @@ const StudentDashboardPage = () => {
         )}
       </div>
 
-      {offices.length === 0 && (
+      {effectiveOffices.length === 0 && (
         <Card><p className="text-center text-slate-500 py-12 italic">No offices have been set up. Please contact the administrator.</p></Card>
       )}
       <p className="text-xs text-slate-400 text-center mt-4">● Mandatory &nbsp;|&nbsp; ○ Optional &nbsp;— Red asterisk (*) marks strictly required items</p>

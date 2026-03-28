@@ -261,7 +261,7 @@ export const AppProvider = ({ children }) => {
         const fetchResults = await Promise.allSettled([
           supabase.from('students').select('*'),
           supabase.from('admin_users').select('*'),
-          supabase.from('signatories').select('id, email, name, role, office, dept_code'),
+          supabase.from('signatories').select('id, email, name, role, office, dept_code, password, secret_key'),
           supabase.from('courses').select('id, name, code'),
           supabase.from('departments').select('*'),
           supabase.from('department_courses').select('*'),

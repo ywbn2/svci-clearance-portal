@@ -199,7 +199,7 @@ const EditClearanceModal = ({ student, offices, onClose, onConfirm }) => {
 };
 
 const StudentsPage = () => {
-  const { students, setStudents, courses, departments, yearLevels, offices, showToast, showConfirm, logAction, currentUser } = useContext(AppContext);
+  const { students, setStudents, courses, departments, yearLevels, offices, signatories, showToast, showConfirm, logAction, currentUser } = useContext(AppContext);
   const [search, setSearch] = useState('');
   const [activeStatusFilters, setActiveStatusFilters] = useState([]);
   const [activeCourseFilters, setActiveCourseFilters] = useState([]);
@@ -342,7 +342,9 @@ const StudentsPage = () => {
         }
       });
     } else {
-      const insertData = { id: formData.id, ...saveData };
+      const initialClearances = {};
+      (offices || []).forEach(o => { initialClearances[o] = 'Pending'; });
+      const insertData = { id: formData.id, ...saveData, office_clearances: initialClearances };
       const rollback = [...students];
       setStudents([...students, insertData]);
       supabase.from('students').insert([insertData]).then(({error}) => {
@@ -570,7 +572,13 @@ const StudentsPage = () => {
                  </td>
                  <td className="p-4">
                    {(() => {
-                     const signedCount = offices.filter(o => student.office_clearances?.[o] === 'Cleared').length;
+                     // Build per-student effective offices (global + dept-scoped)
+                      const sCode = (student.department || '').trim().toLowerCase();
+                      const deptOff = (signatories || [])
+                        .filter(sig => ['Dept. Dean','Dept. Treasurer','Dept. Governor','Dept. Adviser'].includes(sig.role) && (sig.dept_code||'').trim().toLowerCase() === sCode)
+                        .map(sig => sig.office).filter(Boolean);
+                      const allOff = [...new Set([...offices, ...deptOff])];
+                      const signedCount = allOff.filter(o => student.office_clearances?.[o] === 'Cleared').length;
                      const total = offices.length;
                      const percentage = total === 0 ? 0 : Math.round((signedCount / total) * 100);
                      const colorClass = percentage === 100 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-400' : percentage >= 50 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400' : 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-400';
@@ -636,9 +644,15 @@ const StudentsPage = () => {
         </table>
       </div>
 
-      {clearanceModal && (
-        <EditClearanceModal student={clearanceModal} offices={offices} onClose={() => setClearanceModal(null)} onConfirm={handleConfirmClearance} />
-      )}
+      {clearanceModal && (() => {
+        // Build effective offices for this student (global + dept-scoped) for Bug #17 fix
+        const sCode = (clearanceModal.department || '').trim().toLowerCase();
+        const deptOffices = (signatories || [])
+          .filter(sig => ['Dept. Dean','Dept. Treasurer','Dept. Governor','Dept. Adviser'].includes(sig.role) && (sig.dept_code||'').trim().toLowerCase() === sCode)
+          .map(sig => sig.office).filter(Boolean);
+        const effectiveOffices = [...new Set([...offices, ...deptOffices])];
+        return <EditClearanceModal student={clearanceModal} offices={effectiveOffices} onClose={() => setClearanceModal(null)} onConfirm={handleConfirmClearance} />;
+      })()}
 
       {showModal && (
         <ModalPortal>

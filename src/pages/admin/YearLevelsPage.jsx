@@ -12,12 +12,13 @@ const YearLevelsPage = () => {
   const handleAdd = async () => {
     if (!newYear.trim()) return;
     if (yearLevels.includes(newYear.trim())) return showToast('Year level already exists', 'error');
+    const rollback = [...yearLevels];
     const updated = [...yearLevels, newYear.trim()];
     setYearLevels(updated);
     setNewYear('');
     const { error } = await supabase.from('app_settings').update({ year_levels: updated }).eq('id', 1);
     if (error) {
-      setYearLevels(yearLevels); // rollback
+      setYearLevels(rollback); // correct rollback using saved copy
       showToast('Failed to save: ' + error.message, 'error');
     } else {
       showToast('Year level added successfully.');

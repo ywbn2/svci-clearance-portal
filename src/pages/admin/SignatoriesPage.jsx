@@ -325,8 +325,16 @@ const SignatoriesPage = () => {
         setRequirements(requirements.filter(r => r.office !== sig.office && r.author !== sig.email));
 
         const isDeptSpecific = ['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sig.role) || ['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sig.office);
+        const sigDeptCode = (sig.dept_code || '').trim().toLowerCase();
+        // Dual-match: also find legacy students who stored full dept name instead of code
+        const { departments: deptList } = { departments };
+        const sigDeptName = (departments.find(d => (d.code || '').toLowerCase() === sigDeptCode)?.name || '').trim().toLowerCase();
         const targetStudents = isDeptSpecific && sig.dept_code 
-          ? students.filter(s => (s.department || '').trim().toLowerCase() === (sig.dept_code || '').trim().toLowerCase())
+          ? students.filter(s => {
+              const sCode = (s.department || '').trim().toLowerCase();
+              const sName = (s.dept || '').trim().toLowerCase();
+              return sCode === sigDeptCode || (sName !== '' && sName === sigDeptName);
+            })
           : students;
 
         if (targetStudents.length > 0) {
@@ -697,8 +705,8 @@ const SignatoriesPage = () => {
               </select>
               )}
 
-              {/* Department — only shown for Dept. Dean or specific Offices */}
-              {(sigFormData.role === 'Dept. Dean' || ['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sigFormData.office)) && (
+              {/* Department — shown for ALL dept-scoped roles */}
+              {(['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sigFormData.role)) && (
                 <div className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-700 rounded-xl p-4 space-y-2 animate-fade-in">
                   <label className="block text-sm font-black text-emerald-700 dark:text-emerald-400">Assign to Department <span className="text-rose-500">*</span></label>
                   <p className="text-xs text-emerald-600 dark:text-emerald-500">This account will only see and process requests from students within this department.</p>

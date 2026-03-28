@@ -7,7 +7,7 @@ import { YEAR_DAYS, computeExpirationDate, getAccountStatus, getRemainingDays } 
 import emailjs from '@emailjs/browser';
 
 const SignupPage = () => {
-  const { darkMode, courses, departments, students, setStudents, yearLevels, currentUser, eligibleStudents } = useContext(AppContext);
+  const { darkMode, courses, departments, students, setStudents, yearLevels, currentUser, eligibleStudents, offices } = useContext(AppContext);
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -90,6 +90,10 @@ const SignupPage = () => {
     const signupDate = new Date().toISOString().split('T')[0];
     const expirationDate = computeExpirationDate(signupDate, formData.yearLevel);
     
+    // Initialize office_clearances so the student dashboard shows all pending offices immediately
+    const initialClearances = {};
+    (offices || []).forEach(o => { initialClearances[o] = 'Pending'; });
+
     // Explicitly add 'id' so upsert creates the row using the School ID as the primary key
     const insertData = {
       id: formData.id.trim(),
@@ -107,7 +111,8 @@ const SignupPage = () => {
       signup_date: signupDate, 
       expiration_date: expirationDate, 
       account_status: 'Active',
-      status: 'PENDING'
+      status: 'PENDING',
+      office_clearances: initialClearances
     };
 
     // Use upsert instead of update so it creates the row if it doesn't exist

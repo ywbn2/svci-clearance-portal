@@ -327,7 +327,6 @@ const SignatoriesPage = () => {
         const isDeptSpecific = ['Dept. Dean', 'Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sig.role) || ['Dept. Treasurer', 'Dept. Governor', 'Dept. Adviser'].includes(sig.office);
         const sigDeptCode = (sig.dept_code || '').trim().toLowerCase();
         // Dual-match: also find legacy students who stored full dept name instead of code
-        const { departments: deptList } = { departments };
         const sigDeptName = (departments.find(d => (d.code || '').toLowerCase() === sigDeptCode)?.name || '').trim().toLowerCase();
         const targetStudents = isDeptSpecific && sig.dept_code 
           ? students.filter(s => {

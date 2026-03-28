@@ -37,8 +37,13 @@ const RequirementsPage = () => {
     const assignedOffice = isAdmin ? formData.office : currentUser?.office;
 
     if (editingId) {
+      // Non-admins can only edit requirements they posted
+      const existingReq = requirements.find(r => r.id === editingId);
+      if (!isAdmin && existingReq?.author !== currentUser?.email) {
+        return showToast("You can only edit requirements you posted.", "error");
+      }
       const payload = {
-        title: autoTitle, description: formData.description, mandatory: formData.mandatory, office: isAdmin ? formData.office : requirements.find(r=>r.id===editingId)?.office
+        title: autoTitle, description: formData.description, mandatory: formData.mandatory, office: isAdmin ? formData.office : existingReq?.office
       };
       const { error } = await supabase.from('requirements').update(payload).eq('id', editingId);
       if (error) return showToast("DB Error: " + error.message, "error");

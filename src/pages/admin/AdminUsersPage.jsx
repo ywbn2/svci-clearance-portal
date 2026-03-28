@@ -25,6 +25,10 @@ const AdminPage = () => {
 
   const handleSave = async () => {
     if (formData.name && formData.email && formData.password && formData.role) {
+      // Prevent a regular Admin from promoting themselves to Super Admin
+      if (editingId === currentUser?.id && currentUser?.role !== 'Super Admin' && formData.role === 'Super Admin') {
+        return showToast("Only a Super Admin can grant Super Admin privileges.", "error");
+      }
       setShowModal(false);
       const rollback = [...adminUsers];
 

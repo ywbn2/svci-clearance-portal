@@ -6,7 +6,7 @@ import { Card } from '../../components/Navigation';
 import { getScopedOfficeName } from '../../utils/helpers';
 
 const StudentDashboardPage = () => {
-  const { currentUser, offices, officeCategories, requirements, students } = useContext(AppContext);
+  const { currentUser, offices, officeCategories, requirements, students, departments } = useContext(AppContext);
   const student = students.find(s => s.id === currentUser?.id) || currentUser;
   const clearances = student?.office_clearances || {};
 

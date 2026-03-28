@@ -6,7 +6,7 @@ import { AppContext } from '../../context/AppContext';
 import { Modal, ModalPortal } from '../../components/Navigation';
 
 const DepartmentsPage = () => {
-  const { departments, setDepartments, courses, students, setStudents, showToast, showConfirm, logAction, currentUser } = useContext(AppContext);
+  const { departments, setDepartments, courses, students, setStudents, signatories, setSignatories, showToast, showConfirm, logAction, currentUser } = useContext(AppContext);
   const [showModal, setShowModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   
@@ -47,6 +47,8 @@ const DepartmentsPage = () => {
       if (oldDeptCode && oldDeptCode !== codeTrimmed) {
         supabase.from('students').update({ department: codeTrimmed }).eq('department', oldDeptCode || null).then();
         supabase.from('signatories').update({ dept_code: codeTrimmed }).eq('dept_code', oldDeptCode || null).then();
+        // Also update local signatories state so the page reflects new dept code immediately
+        if (setSignatories) setSignatories(prev => prev.map(s => s.dept_code === oldDeptCode ? { ...s, dept_code: codeTrimmed } : s));
       }
 
       supabase.from('departments').update({ name: nameTrimmed, code: codeTrimmed }).eq('id', editingDeptId).then(({error}) => {
@@ -71,6 +73,7 @@ const DepartmentsPage = () => {
         } else {
           setDepartments([...rollback, { id: data[0].id, name: nameTrimmed, code: codeTrimmed, assignedCourses: [] }]);
           showToast(`Department '${codeTrimmed}' created!`);
+          if (logAction) logAction(currentUser, 'Added Department', `Created department: ${nameTrimmed} (${codeTrimmed})`);
         }
       });
     }
@@ -90,6 +93,7 @@ const DepartmentsPage = () => {
         await supabase.from('signatories').update({ dept_code: 'Unassigned' }).eq('dept_code', deptObj.code);
         await supabase.from('departments').delete().eq('id', deptObj.id);
         showToast(`Department '${deptObj.code}' deleted.`, "error");
+        if (logAction) logAction(currentUser, 'Deleted Department', `Removed department: ${deptObj.name} (${deptObj.code})`);
       } catch (err) {
         setDepartments(rollbackDepts);
         setStudents(rollbackStudents);

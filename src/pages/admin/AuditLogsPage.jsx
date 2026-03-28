@@ -28,7 +28,7 @@ const AuditLogsPage = () => {
     setLoading(false);
   };
 
-  useEffect(() => { fetchLogs(); }, []);
+  useEffect(() => { fetchLogs(); }, [currentUser?.id]);
 
   const handleClearLogs = async () => {
     const sig = signatories.find(s => s.id === currentUser?.id);

@@ -56,7 +56,12 @@ const SignatoryStudentsPage = () => {
     const matchStatus = activeStatusFilters.length === 0 || activeStatusFilters.includes(clearanceStatus);
     const matchCourse = activeCourseFilters.length === 0 || activeCourseFilters.includes(s.course);
     const matchYear = activeYearFilters.length === 0 || activeYearFilters.includes(s.yearLevel);
-    const matchDept = activeDeptFilters.length === 0 || activeDeptFilters.includes(s.department);
+    const matchDept = activeDeptFilters.length === 0 
+      || activeDeptFilters.includes(s.department)
+      || activeDeptFilters.some(code => {
+          const deptFullName = (departments.find(d => (d.code || '') === code)?.name || '').trim().toLowerCase();
+          return deptFullName !== '' && deptFullName === (s.dept || '').trim().toLowerCase();
+        });
     return matchSearch && matchStatus && matchCourse && matchYear && matchDept;
   }).sort((a, b) => (a.lastname || '').localeCompare(b.lastname || ''));
 

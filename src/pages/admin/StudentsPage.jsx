@@ -501,7 +501,7 @@ const StudentsPage = () => {
   };
 
   return (
-    <Card className="h-full relative">
+    <Card className="min-h-full h-fit relative">
       <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
         <h2 className="text-2xl font-black text-slate-800 dark:text-white">Student Masterlist</h2>
         <div className="flex items-center gap-2 flex-wrap">

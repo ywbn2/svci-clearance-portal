@@ -578,7 +578,7 @@ const StudentsPage = () => {
         </div>
       </div>
 
-      <div className="w-full border dark:border-slate-700 rounded-lg shadow-sm overflow-x-auto overflow-y-visible custom-scrollbar min-h-[380px]">
+      <div className={`w-full border dark:border-slate-700 rounded-lg shadow-sm overflow-x-auto overflow-y-visible custom-scrollbar transition-all duration-300 ${activeDropdown ? 'pb-[260px]' : ''}`}>
         <table className="w-full text-left text-base min-w-[1200px]">
           <thead className="bg-slate-100 dark:bg-slate-900/80 border-b dark:border-slate-700 text-slate-800 dark:text-slate-200">
             <tr><th className="p-4">ID</th><th className="p-4 " style={{ minWidth: '200px' }}>Name</th><th className="p-4">Course</th><th className="p-4">Year Level</th><th className="p-4">Department</th><th className="p-4">Clearance</th><th className="p-4">Account</th><th className="p-4">Expiration</th><th className="p-4">Remaining</th><th className="p-4 text-center">Actions</th></tr>

@@ -101,6 +101,7 @@ const SignupPage = () => {
       gender: formData.gender || null,
       yearLevel: formData.yearLevel,
       course: formData.course,
+      dept: assignedDept,        // actual NOT NULL column in DB
       email: formData.email,
       password: formData.password,
       signup_date: signupDate,

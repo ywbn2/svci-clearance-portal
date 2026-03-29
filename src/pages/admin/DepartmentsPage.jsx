@@ -45,7 +45,7 @@ const DepartmentsPage = () => {
       setStudents(students.map(s => s.department === oldDeptCode ? {...s, department: codeTrimmed} : s));
 
       if (oldDeptCode && oldDeptCode !== codeTrimmed) {
-        supabase.from('students').update({ department: codeTrimmed }).eq('department', oldDeptCode || null).then();
+        supabase.from('students').update({ dept: codeTrimmed }).eq('dept', oldDeptCode || null).then();
         supabase.from('signatories').update({ dept_code: codeTrimmed }).eq('dept_code', oldDeptCode || null).then();
         // Also update local signatories state so the page reflects new dept code immediately
         if (setSignatories) setSignatories(prev => prev.map(s => s.dept_code === oldDeptCode ? { ...s, dept_code: codeTrimmed } : s));
@@ -89,7 +89,7 @@ const DepartmentsPage = () => {
 
       try {
         await supabase.from('department_courses').delete().eq('department_id', deptObj.id);
-        await supabase.from('students').update({ department: 'Unassigned' }).eq('department', deptObj.code);
+        await supabase.from('students').update({ dept: 'Unassigned' }).eq('dept', deptObj.code);
         await supabase.from('signatories').update({ dept_code: 'Unassigned' }).eq('dept_code', deptObj.code);
         await supabase.from('departments').delete().eq('id', deptObj.id);
         showToast(`Department '${deptObj.code}' deleted.`, "error");
@@ -126,10 +126,10 @@ const DepartmentsPage = () => {
 
     // Fire safety sync to resolve orphaned students automatically
     if (removedCourses.length > 0) {
-      await supabase.from('students').update({ department: 'Unassigned' }).in('course', removedCourses);
+      await supabase.from('students').update({ dept: 'Unassigned' }).in('course', removedCourses);
     }
     if (addedCourses.length > 0) {
-      await supabase.from('students').update({ department: assigningDept.code }).in('course', addedCourses);
+      await supabase.from('students').update({ dept: assigningDept.code }).in('course', addedCourses);
     }
 
     // Cascade visuals directly without latency

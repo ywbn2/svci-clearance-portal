@@ -117,10 +117,10 @@ const SignupPage = () => {
       return setError("Registration failed: " + dbError.message);
     }
 
-    // Step 2: Write department + office_clearances separately (schema-cache-tolerant)
+    // Step 2: Write dept + office_clearances separately (schema-cache-tolerant)
     const initialClearances = {};
     (offices || []).forEach(o => { initialClearances[o] = 'Pending'; });
-    const extraFields = { department: assignedDept };
+    const extraFields = { dept: assignedDept };
     if (Object.keys(initialClearances).length > 0) {
       extraFields.office_clearances = initialClearances;
     }

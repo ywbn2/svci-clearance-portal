@@ -459,11 +459,11 @@ const StudentsPage = () => {
     for (const s of toRepair) {
       const code = nameToCode[(s.dept || "").trim().toLowerCase()];
       if (code) {
-        const { error } = await supabase.from('students').update({ department: code }).eq('id', s.id);
+        const { error } = await supabase.from('students').update({ dept: code }).eq('id', s.id);
         if (!error) successCount++;
       } else if (Object.values(nameToCode).includes((s.dept || "").trim().toUpperCase())) {
         const manualCode = (s.dept || "").trim().toUpperCase();
-        const { error } = await supabase.from('students').update({ department: manualCode }).eq('id', s.id);
+        const { error } = await supabase.from('students').update({ dept: manualCode }).eq('id', s.id);
         if (!error) successCount++;
       }
     }

@@ -295,9 +295,13 @@ const StudentsPage = () => {
     const matchStatus = activeStatusFilters.length === 0 || activeStatusFilters.includes(s.status);
     const matchCourse = activeCourseFilters.length === 0 || activeCourseFilters.includes(s.course);
     const matchYear = activeYearFilters.length === 0 || activeYearFilters.includes(s.yearLevel);
-    // Use s.dept (actual DB column) for filtering, fall back to s.department for new-style records
-    const studentDept = (s.dept || s.department || '').trim();
-    const matchDept = activeDeptFilters.length === 0 || activeDeptFilters.includes(studentDept);
+    // Resolve dept code via course lookup - works for all records regardless of s.dept value
+    const resolvedDept = (() => {
+      const d = departments.find(dep => (dep.assignedCourses || []).includes(s.course));
+      if (d) return d.code;
+      return (s.dept || s.department || '').trim();
+    })();
+    const matchDept = activeDeptFilters.length === 0 || activeDeptFilters.includes(resolvedDept);
     return matchSearch && matchStatus && matchCourse && matchYear && matchDept;
   }).sort((a, b) => (a.lastname || '').localeCompare(b.lastname || ''));
   const [editingId, setEditingId] = useState(null);
@@ -347,7 +351,7 @@ const StudentsPage = () => {
       gender: formData.gender || null,
       yearLevel: formData.yearLevel || null,
       course: formData.course,
-      department: assignedDept,
+      dept: assignedDept,
       email: formData.email,
       password: formData.password
     };
@@ -592,7 +596,7 @@ const StudentsPage = () => {
                    <span className="bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400 px-2 py-1 rounded text-sm font-black" title={(() => {
                      const fdept = departments.find(d => d.code === student.department);
                      return fdept ? fdept.name : student.department;
-                   })()}>{student.department}</span>
+                   })()}>{ (() => { const dO = departments.find(d => (d.assignedCourses||[]).includes(student.course)); return dO ? dO.code : (student.dept || student.department || '—'); })() }</span>
                  </td>
                  <td className="p-4">
                    {(() => {

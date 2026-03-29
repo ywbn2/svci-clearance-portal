@@ -89,55 +89,60 @@ const SignupPage = () => {
 
     const signupDate = new Date().toISOString().split('T')[0];
     const expirationDate = computeExpirationDate(signupDate, formData.yearLevel);
-    
-    // Initialize office_clearances so the student dashboard shows all pending offices immediately
-    const initialClearances = {};
-    (offices || []).forEach(o => { initialClearances[o] = 'Pending'; });
 
-    // Explicitly add 'id' so upsert creates the row using the School ID as the primary key
+    // Step 1: Upsert core student record (no office_clearances to avoid schema cache issues)
     const insertData = {
       id: formData.id.trim(),
-      name: fullName, 
-      firstname: formData.firstname.trim(), 
+      name: fullName,
+      firstname: formData.firstname.trim(),
       middlename: formData.middlename.trim() || null,
-      lastname: formData.lastname.trim(), 
-      dob: formData.dob || null, 
-      gender: formData.gender || null, 
+      lastname: formData.lastname.trim(),
+      dob: formData.dob || null,
+      gender: formData.gender || null,
       yearLevel: formData.yearLevel,
-      course: formData.course, 
-      department: assignedDept, 
-      email: formData.email, 
+      course: formData.course,
+      department: assignedDept,
+      email: formData.email,
       password: formData.password,
-      signup_date: signupDate, 
-      expiration_date: expirationDate, 
+      signup_date: signupDate,
+      expiration_date: expirationDate,
       account_status: 'Active',
       status: 'PENDING',
-      office_clearances: initialClearances
     };
 
-    // Use upsert instead of update so it creates the row if it doesn't exist
     const { error: dbError } = await supabase.from('students').upsert(insertData);
-    setIsLoading(false);
 
     if (dbError) {
-      setError("Registration failed: " + dbError.message);
-    } else {
-      // Safely append to the global students memory array so it shows up immediately in the Masterlist
-      if (typeof setStudents === 'function') {
-        setStudents(prev => {
-          const arr = Array.isArray(prev) ? prev : [];
-          const exists = arr.findIndex(s => s.id === formData.id);
-          if (exists > -1) {
-            const copy = [...arr];
-            copy[exists] = { ...copy[exists], ...insertData };
-            return copy;
-          }
-          return [...arr, insertData];
-        });
-      }
-      setSuccess(true);
-      setTimeout(() => navigate('/login'), 2500);
+      setIsLoading(false);
+      return setError("Registration failed: " + dbError.message);
     }
+
+    // Step 2: Initialize office_clearances separately so schema cache issues don't block signup
+    const initialClearances = {};
+    (offices || []).forEach(o => { initialClearances[o] = 'Pending'; });
+    if (Object.keys(initialClearances).length > 0) {
+      await supabase.from('students')
+        .update({ office_clearances: initialClearances })
+        .eq('id', formData.id.trim());
+    }
+
+    setIsLoading(false);
+    const fullInsertData = { ...insertData, office_clearances: initialClearances };
+
+    if (typeof setStudents === 'function') {
+      setStudents(prev => {
+        const arr = Array.isArray(prev) ? prev : [];
+        const exists = arr.findIndex(s => s.id === formData.id);
+        if (exists > -1) {
+          const copy = [...arr];
+          copy[exists] = { ...copy[exists], ...fullInsertData };
+          return copy;
+        }
+        return [...arr, fullInsertData];
+      });
+    }
+    setSuccess(true);
+    setTimeout(() => navigate('/login'), 2500);
   };
 
   if (verificationStep) {

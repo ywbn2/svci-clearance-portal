@@ -90,7 +90,7 @@ const SignupPage = () => {
     const signupDate = new Date().toISOString().split('T')[0];
     const expirationDate = computeExpirationDate(signupDate, formData.yearLevel);
 
-    // Step 1: Upsert core student record (no office_clearances to avoid schema cache issues)
+    // Step 1: Upsert ONLY safe/universal columns — avoids schema cache rejection
     const insertData = {
       id: formData.id.trim(),
       name: fullName,
@@ -101,7 +101,6 @@ const SignupPage = () => {
       gender: formData.gender || null,
       yearLevel: formData.yearLevel,
       course: formData.course,
-      department: assignedDept,
       email: formData.email,
       password: formData.password,
       signup_date: signupDate,
@@ -117,14 +116,14 @@ const SignupPage = () => {
       return setError("Registration failed: " + dbError.message);
     }
 
-    // Step 2: Initialize office_clearances separately so schema cache issues don't block signup
+    // Step 2: Write department + office_clearances separately (schema-cache-tolerant)
     const initialClearances = {};
     (offices || []).forEach(o => { initialClearances[o] = 'Pending'; });
+    const extraFields = { department: assignedDept };
     if (Object.keys(initialClearances).length > 0) {
-      await supabase.from('students')
-        .update({ office_clearances: initialClearances })
-        .eq('id', formData.id.trim());
+      extraFields.office_clearances = initialClearances;
     }
+    await supabase.from('students').update(extraFields).eq('id', formData.id.trim());
 
     setIsLoading(false);
     const fullInsertData = { ...insertData, office_clearances: initialClearances };

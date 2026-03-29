@@ -268,12 +268,36 @@ const StudentsPage = () => {
     else setFn([...currentArr, val]);
   };
 
+  // Smart dept toggle: auto-selects/deselects the courses assigned to that department
+  const toggleDeptFilter = (deptCode) => {
+    const deptObj = departments.find(d => d.code === deptCode);
+    const deptCourses = deptObj?.assignedCourses || [];
+
+    if (activeDeptFilters.includes(deptCode)) {
+      // Deselecting: remove dept, and remove its courses IF they're not shared with another active dept
+      const remainingDepts = activeDeptFilters.filter(d => d !== deptCode);
+      const coursesStillNeeded = new Set(
+        departments.filter(d => remainingDepts.includes(d.code)).flatMap(d => d.assignedCourses || [])
+      );
+      const newCourseFilters = activeCourseFilters.filter(c => !deptCourses.includes(c) || coursesStillNeeded.has(c));
+      setActiveDeptFilters(remainingDepts);
+      setActiveCourseFilters(newCourseFilters);
+    } else {
+      // Selecting: add dept and auto-add its courses
+      setActiveDeptFilters([...activeDeptFilters, deptCode]);
+      const newCourses = deptCourses.filter(c => !activeCourseFilters.includes(c));
+      setActiveCourseFilters([...activeCourseFilters, ...newCourses]);
+    }
+  };
+
   const filteredStudents = students.filter(s => {
     const matchSearch = (s.name?.toLowerCase() || '').includes(search.toLowerCase()) || (s.id?.toLowerCase() || '').includes(search.toLowerCase());
     const matchStatus = activeStatusFilters.length === 0 || activeStatusFilters.includes(s.status);
     const matchCourse = activeCourseFilters.length === 0 || activeCourseFilters.includes(s.course);
     const matchYear = activeYearFilters.length === 0 || activeYearFilters.includes(s.yearLevel);
-    const matchDept = activeDeptFilters.length === 0 || activeDeptFilters.includes(s.department);
+    // Use s.dept (actual DB column) for filtering, fall back to s.department for new-style records
+    const studentDept = (s.dept || s.department || '').trim();
+    const matchDept = activeDeptFilters.length === 0 || activeDeptFilters.includes(studentDept);
     return matchSearch && matchStatus && matchCourse && matchYear && matchDept;
   }).sort((a, b) => (a.lastname || '').localeCompare(b.lastname || ''));
   const [editingId, setEditingId] = useState(null);
@@ -538,7 +562,7 @@ const StudentsPage = () => {
               <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Department</span>
               <div className="grid grid-cols-3 gap-1">
                 {departments.map(d => (
-                  <button key={d.id} onClick={() => toggleFilter(setActiveDeptFilters, activeDeptFilters, d.code)}
+                  <button key={d.id} onClick={() => toggleDeptFilter(d.code)}
                     className={`px-1.5 py-1 rounded-md text-[11px] font-black transition-all border-2 truncate ${activeDeptFilters.includes(d.code) ? 'bg-violet-600 text-white border-violet-700' : 'bg-white text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700 hover:border-slate-300'}`} title={d.name}>
                     {d.code}
                   </button>

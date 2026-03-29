@@ -578,14 +578,14 @@ const StudentsPage = () => {
         </div>
       </div>
 
-      <div className="w-full border dark:border-slate-700 rounded-lg shadow-sm overflow-x-auto custom-scrollbar">
+      <div className="w-full border dark:border-slate-700 rounded-lg shadow-sm overflow-x-auto overflow-y-visible custom-scrollbar min-h-[380px]">
         <table className="w-full text-left text-base min-w-[1200px]">
           <thead className="bg-slate-100 dark:bg-slate-900/80 border-b dark:border-slate-700 text-slate-800 dark:text-slate-200">
             <tr><th className="p-4">ID</th><th className="p-4 " style={{ minWidth: '200px' }}>Name</th><th className="p-4">Course</th><th className="p-4">Year Level</th><th className="p-4">Department</th><th className="p-4">Clearance</th><th className="p-4">Account</th><th className="p-4">Expiration</th><th className="p-4">Remaining</th><th className="p-4 text-center">Actions</th></tr>
           </thead>
           <tbody className="text-slate-700 dark:text-slate-300">
             {filteredStudents.map((student, idx) => (
-              <tr key={idx} className="border-b last:border-0 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+              <tr key={idx} className={`border-b last:border-0 dark:border-slate-700 transition ${idx % 2 === 0 ? 'bg-white dark:bg-slate-900/30' : 'bg-slate-50/50 dark:bg-slate-800/20'} hover:bg-blue-50/50 dark:hover:bg-slate-700/40`}>
                  <td className="p-4">{student.id}</td>
                  <td className="p-4 font-bold text-slate-900 dark:text-white">{student.name}</td>
                  <td className="p-4">
@@ -607,7 +607,7 @@ const StudentsPage = () => {
                         .map(sig => sig.office).filter(Boolean);
                       const allOff = [...new Set([...offices, ...deptOff])];
                       const signedCount = allOff.filter(o => student.office_clearances?.[o] === 'Cleared').length;
-                     const total = offices.length;
+                     const total = allOff.length;
                      const percentage = total === 0 ? 0 : Math.round((signedCount / total) * 100);
                      const colorClass = percentage === 100 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-400' : percentage >= 50 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400' : 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-400';
                      const barColor = percentage === 100 ? 'bg-emerald-500' : percentage >= 50 ? 'bg-amber-500' : 'bg-rose-500';
